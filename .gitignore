@@ -16,70 +16,45 @@ parts/
 sdist/
 var/
 wheels/
-pip-wheel-metadata/
-share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
 MANIFEST
 
 # Virtual environments
+.venv/
 venv/
 ENV/
 env/
-.venv
-.venv/
 
-# direnv
-.direnv/
-.envrc.local
+# Testing
+.tox/
+.coverage
+.coverage.*
+.cache
+.pytest_cache/
+htmlcov/
+.hypothesis/
 
-# IDE
+# IDEs
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-.project
-.pydevproject
-
-# Testing
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-htmlcov/
-
-# Reports
-reports/
-verification-reports/
-*.pdf
-*.html
-test_results.json
-
-# OS
 .DS_Store
-Thumbs.db
 
-# Logs
+# Project specific
+reports/
+results/
 *.log
+.mypy_cache/
+.dmypy.json
+dmypy.json
 
-# Temporary files
-*.tmp
-temp/
-tmp/
+# Distribution
+pip-log.txt
+pip-delete-this-directory.txt
 
-# Configuration
-vibe-verifier.json
-.env
-
-# Documentation build
-docs/_build/
-site/
+# Pre-commit
+.pre-commit-config.yaml

@@ -1,9 +1,6 @@
 [build-system]
-requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
+requires = ["setuptools>=65", "wheel"]
 build-backend = "setuptools.build_meta"
-
-[tool.setuptools_scm]
-write_to = "src/_version.py"
 
 [project]
 name = "vibe-verifier"
@@ -29,6 +26,29 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Operating System :: OS Independent",
 ]
+dependencies = [
+    # Core dependencies
+    "radon>=5.1.0",
+    "markdown>=3.4.0",
+    "jinja2>=3.1.0",
+    "fpdf2>=2.7.0",
+    "beautifulsoup4>=4.12.0",
+    "pyyaml>=6.0",
+    "toml>=0.10.2",
+    # Static analysis
+    "pylint>=2.17.0",
+    "mypy>=1.5.0",
+    "bandit>=1.7.0",
+    "safety>=2.3.0",
+    # Testing
+    "pytest>=7.4.0",
+    "pytest-json-report>=1.5.0",
+    "coverage>=7.3.0",
+    # Formatting
+    "black>=23.7.0",
+    "isort>=5.12.0",
+    "flake8>=6.1.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/vibes/vibe-verifier"
@@ -36,6 +56,19 @@ Documentation = "https://github.com/vibes/vibe-verifier/blob/main/README.md"
 Repository = "https://github.com/vibes/vibe-verifier"
 Issues = "https://github.com/vibes/vibe-verifier/issues"
 Contributing = "https://github.com/vibes/vibe-verifier/blob/main/CONTRIBUTING.md"
+
+[project.optional-dependencies]
+dev = [
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.11.0",
+    "pytest-timeout>=2.1.0",
+    "hypothesis>=6.82.0",
+    "ipython>=8.14.0",
+    "ipdb>=0.13.13",
+    "pre-commit>=3.3.3",
+    "build>=0.10.0",
+    "twine>=4.0.2",
+]
 
 [project.scripts]
 vibe-verifier = "src.main:main"

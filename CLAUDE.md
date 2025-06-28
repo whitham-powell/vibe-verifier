@@ -44,10 +44,8 @@ When adding new analyzers or features:
 
 - Python 3.8+
 - Git
-- Make (optional but recommended)
-- uv (recommended) or pip
 
-### Initial Setup
+### Quick Start
 
 1. Clone the repository:
 ```bash
@@ -55,84 +53,17 @@ git clone https://github.com/vibes/vibe-verifier.git
 cd vibe-verifier
 ```
 
-2. **Recommended: Use uv for fast package management**
-```bash
-# Install uv if not already installed
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Run the uv setup script
-./scripts/setup-dev-uv.sh
-```
-
-This script will:
-- Install uv (if not present)
-- Create a virtual environment with Python 3.10
-- Install all dependencies (10-100x faster than pip)
-- Set up pre-commit hooks
-- Verify the installation
-
-### Alternative Setup Methods
-
-#### Using traditional pip:
-```bash
-./scripts/setup-dev.sh
-```
-
-#### Manual setup with uv:
-```bash
-# Create virtual environment with uv
-uv venv .venv --python 3.10
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# Install dependencies with uv (much faster!)
-uv pip install -r requirements-dev.txt
-uv pip install -e .
-
-# Set up pre-commit hooks
-pre-commit install
-```
-
-#### Manual setup with pip:
+2. Create a virtual environment and install:
 ```bash
 # Create virtual environment
 python3 -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
-# Install dependencies (slower)
-pip install --upgrade pip setuptools wheel
-pip install -r requirements-dev.txt
-pip install -e .
-
-# Set up pre-commit hooks
-pre-commit install
+# Install in development mode
+pip install -e ".[dev]"
 ```
 
-### Environment Management Options
-
-1. **Virtual Environment (Recommended)**
-   - Isolated from system Python
-   - Dependencies don't conflict with system packages
-   - Easy to recreate/delete
-
-2. **direnv (Automatic Activation)**
-   ```bash
-   # Install direnv
-   brew install direnv  # macOS
-   sudo apt install direnv  # Ubuntu
-   
-   # Enable in shell
-   echo 'eval "$(direnv hook bash)"' >> ~/.bashrc
-   
-   # Allow the .envrc
-   direnv allow
-   ```
-
-3. **pyenv (Multiple Python Versions)**
-   ```bash
-   # Install Python 3.10.12 (specified in .python-version)
-   pyenv install 3.10.12
-   pyenv local 3.10.12
-   ```
+That's it! The tool is now installed with all dependencies.
 
 ### Verify Setup
 
@@ -141,10 +72,10 @@ pre-commit install
 python --version
 
 # Check vibe-verifier is installed
-python -c "import src; print(src.__version__)"
+vibe-verifier --version
 
 # Run tests
-make test
+pytest
 ```
 
 ## Project Structure
@@ -240,16 +171,16 @@ The architecture reflects our "trust but verify" philosophy:
 
 ```bash
 # Run all tests
-make test
+pytest
 
 # Run with coverage
-make test-coverage
+pytest --cov=src --cov-report=html --cov-report=term
 
-# Run only unit tests
-make test-unit
+# Run only unit tests  
+pytest -k "not integration"
 
 # Run only integration tests
-make test-integration
+pytest tests/test_integration.py
 
 # Run specific test file
 pytest tests/test_complexity_analyzer.py -v
@@ -432,8 +363,14 @@ def _generate_new_format_report(self, report_data: Dict[str, Any]) -> Path:
 
 1. Follow PEP 8:
 ```bash
-make format  # Auto-format with black and isort
-make lint    # Check with pylint, flake8, mypy
+# Format code
+black src/ tests/
+isort src/ tests/
+
+# Check linting
+pylint src/
+flake8 src/
+mypy src/
 ```
 
 2. Type hints are required:
@@ -626,35 +563,42 @@ def test_health_score_bounds(complexity, loc):
     assert 0 <= score <= 100
 ```
 
-## Continuous Integration
-
-### GitHub Actions Workflow
-
-The CI pipeline (`/.github/workflows/ci.yml`):
-1. Tests on Python 3.8-3.11
-2. Tests on Ubuntu, Windows, macOS
-3. Runs linting and type checking
-4. Generates coverage reports
-5. Builds and validates package
-
-### Running CI Locally
+## Common Commands
 
 ```bash
-# Install act (GitHub Actions locally)
-brew install act  # or see https://github.com/nektos/act
+# Install for development
+pip install -e ".[dev]"
 
-# Run CI workflow
-act -j test
+# Run tests
+pytest
+
+# Format code
+black src/ tests/
+isort src/ tests/
+
+# Type check
+mypy src/
+
+# Run linting
+pylint src/
+flake8 src/
+
+# Build package
+python -m build
+
+# Clean up
+find . -type d -name "__pycache__" -exec rm -rf {} +
+find . -type f -name "*.pyc" -delete
 ```
 
 ## Release Process
 
-1. Update version in `setup.py` and `pyproject.toml`
+1. Update version in `pyproject.toml`
 2. Update CHANGELOG.md
 3. Create release PR
 4. After merge, tag release: `git tag v1.2.3`
 5. Push tag: `git push origin v1.2.3`
-6. GitHub Actions builds and publishes to PyPI
+6. Build and publish: `python -m build && twine upload dist/*`
 
 ## Getting Help
 
