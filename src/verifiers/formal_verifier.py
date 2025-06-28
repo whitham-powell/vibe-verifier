@@ -57,16 +57,6 @@ class FormalVerifier:
             "go": self._check_go_verification(),
         }
 
-    def _check_rust_verification(self) -> Dict[str, bool]:
-        """Check available Rust verification tools."""
-        return {
-            "prusti": shutil.which("prusti") is not None,
-            "kani": shutil.which("kani") is not None,
-            "creusot": shutil.which("creusot") is not None,
-            "miri": shutil.which("cargo-miri") is not None,
-            "contracts": any(self.repo_path.rglob("*.rs")),
-        }
-
     def _check_c_cpp_verification(self) -> Dict[str, bool]:
         """Check available C/C++ verification tools."""
         return {
@@ -118,6 +108,15 @@ class FormalVerifier:
             "staticcheck": shutil.which("staticcheck") is not None,
             "gosec": shutil.which("gosec") is not None,
             "files": any(self.repo_path.rglob("*.go")),
+        }
+
+    def _check_rust_verification(self) -> Dict[str, bool]:
+        """Check available Rust verification tools."""
+        return {
+            "prusti": shutil.which("prusti") is not None
+            or shutil.which("cargo-prusti") is not None,
+            "kani": shutil.which("kani") is not None or shutil.which("cargo-kani") is not None,
+            "files": any(self.repo_path.rglob("*.rs")),
         }
 
     def _verify_rust(self) -> None:

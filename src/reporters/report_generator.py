@@ -8,21 +8,38 @@ from typing import Any, Dict, List, Optional
 import jinja2
 from fpdf import FPDF
 
+from ..utils.security import get_safe_path, sanitize_results
+
 
 class ReportGenerator:
     """Generates human-readable reports from analysis results."""
 
-    def __init__(self, results_dir: Optional[str] = None):
+    def __init__(
+        self, results_dir: Optional[str] = None, sanitize: bool = True, redact_level: str = "medium"
+    ):
         """Initialize the ReportGenerator.
 
         Args:
             results_dir: Optional directory path for saving reports.
+            sanitize: Whether to sanitize sensitive information from reports.
+            redact_level: Level of redaction - "low", "medium", or "high".
         """
-        self.results_dir = Path(results_dir) if results_dir else Path.cwd() / "reports"
+        base_dir = Path(results_dir) if results_dir else Path.cwd() / "reports"
+        base_dir.mkdir(exist_ok=True)
+
+        # Create a timestamped subdirectory for this run
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.results_dir = base_dir / f"run_{timestamp}"
         self.results_dir.mkdir(exist_ok=True)
 
-        # Set up Jinja2 environment
-        self.jinja_env = jinja2.Environment(loader=jinja2.DictLoader(self._get_templates()))
+        self.sanitize = sanitize
+        self.redact_level = redact_level
+
+        # Set up Jinja2 environment with autoescape for security
+        self.jinja_env = jinja2.Environment(
+            loader=jinja2.DictLoader(self._get_templates()),
+            autoescape=jinja2.select_autoescape(["html", "xml"]),
+        )
 
     def generate_report(
         self,
@@ -60,7 +77,10 @@ class ReportGenerator:
 
         # Generate verification steps
         steps_file = self._generate_verification_steps(report_data)
-        generated_files["verification_steps"] = str(steps_file)
+        generated_files["verification_report"] = str(steps_file)
+
+        # Generate a summary README for the run directory
+        self._generate_run_summary(report_data, generated_files)
 
         return generated_files
 
@@ -89,12 +109,14 @@ class ReportGenerator:
             complexity, verification, tests, git_history
         )
 
-        return {
+        report_data = {
             "metadata": {
                 "repository": repo_name,
-                "path": repo_path,
+                "path": get_safe_path(repo_path) if self.sanitize else repo_path,
                 "timestamp": timestamp,
                 "analysis_version": "1.0.0",
+                "sanitized": self.sanitize,
+                "redact_level": self.redact_level if self.sanitize else None,
             },
             "summary": {
                 "health_score": health_score,
@@ -112,6 +134,12 @@ class ReportGenerator:
             "recommendations": recommendations,
             "detailed_findings": self._compile_detailed_findings(complexity, verification, tests),
         }
+
+        # Sanitize the entire report if enabled
+        if self.sanitize:
+            report_data = sanitize_results(report_data, self.redact_level)
+
+        return report_data
 
     def _calculate_health_score(
         self,
@@ -678,8 +706,7 @@ class ReportGenerator:
         template = self.jinja_env.get_template("markdown_report")
         content = template.render(**report_data)
 
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"report_{report_data['metadata']['repository']}_{timestamp}.md"
+        filename = f"report_{report_data['metadata']['repository']}.md"
         filepath = self.results_dir / filename
 
         with open(filepath, "w") as f:
@@ -692,8 +719,7 @@ class ReportGenerator:
         template = self.jinja_env.get_template("html_report")
         content = template.render(**report_data)
 
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"report_{report_data['metadata']['repository']}_{timestamp}.html"
+        filename = f"report_{report_data['metadata']['repository']}.html"
         filepath = self.results_dir / filename
 
         with open(filepath, "w") as f:
@@ -703,8 +729,7 @@ class ReportGenerator:
 
     def _generate_json_report(self, report_data: Dict[str, Any]) -> Path:
         """Generate JSON report."""
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"report_{report_data['metadata']['repository']}_{timestamp}.json"
+        filename = f"report_{report_data['metadata']['repository']}.json"
         filepath = self.results_dir / filename
 
         with open(filepath, "w") as f:
@@ -766,8 +791,7 @@ class ReportGenerator:
             pdf.multi_cell(0, 6, f"Action: {rec['action']}", align="L")
             pdf.ln(5)
 
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"report_{report_data['metadata']['repository']}_{timestamp}.pdf"
+        filename = f"report_{report_data['metadata']['repository']}.pdf"
         filepath = self.results_dir / filename
 
         pdf.output(str(filepath))
@@ -779,14 +803,75 @@ class ReportGenerator:
         template = self.jinja_env.get_template("verification_steps")
         content = template.render(**report_data)
 
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"verification_steps_{report_data['metadata']['repository']}_{timestamp}.md"
+        filename = f"verification_report_{report_data['metadata']['repository']}.md"
         filepath = self.results_dir / filename
 
         with open(filepath, "w") as f:
             f.write(content)
 
         return filepath
+
+    def _generate_run_summary(
+        self, report_data: Dict[str, Any], generated_files: Dict[str, str]
+    ) -> None:
+        """Generate a README for the run directory explaining the contents."""
+        readme_content = f"""# Vibe Verifier Analysis Results
+
+**Repository**: {report_data['metadata']['repository']}
+**Analysis Date**: {report_data['metadata']['timestamp']}
+**Health Score**: {report_data['summary']['health_score']:.1f}/100
+
+## Files in This Directory
+
+This directory contains all analysis results from a single run of Vibe Verifier.
+
+### Report Files
+
+"""
+
+        if "markdown" in generated_files:
+            readme_content += "- **report_*.md** - Main analysis report in Markdown format\n"
+        if "html" in generated_files:
+            readme_content += "- **report_*.html** - Interactive HTML report with styling\n"
+        if "json" in generated_files:
+            readme_content += "- **report_*.json** - Complete analysis data in JSON format\n"
+        if "pdf" in generated_files:
+            readme_content += "- **report_*.pdf** - PDF report for sharing/printing\n"
+        if "verification_report" in generated_files:
+            readme_content += (
+                "- **verification_report_*.md** - Details of automated verifications performed\n"
+            )
+
+        readme_content += f"""
+### Summary
+
+- **Total Files Analyzed**: {report_data['summary']['total_files_analyzed']}
+- **Critical Issues Found**: {report_data['summary']['critical_issues_count']}
+- **Languages Detected**: {', '.join(report_data['summary']['languages_detected'])}
+
+### Quick Actions
+
+1. View the main report: Open `report_{report_data['metadata']['repository']}.md` or `.html`
+2. Check verification details: Open `verification_report_{report_data['metadata']['repository']}.md`
+3. Access raw data: Use `report_{report_data['metadata']['repository']}.json` for
+   programmatic access
+
+### Understanding the Results
+
+The analysis covers:
+- Code complexity metrics
+- Security vulnerabilities
+- Test execution results
+- Type checking issues
+- Documentation verification
+- Git history analysis (if applicable)
+
+For detailed explanations of each metric, see the main report.
+"""
+
+        readme_path = self.results_dir / "README.md"
+        with open(readme_path, "w") as f:
+            f.write(readme_content)
 
     def _get_templates(self) -> Dict[str, str]:
         """Return Jinja2 templates."""
@@ -980,228 +1065,161 @@ Action: {{ rec.action }}
     {% endfor %}
 </body>
 </html>""",
-            "verification_steps": """# Verification Steps for {{ metadata.repository }}
+            "verification_steps": """# Verification Report for {{ metadata.repository }}
 
 Generated: {{ metadata.timestamp }}
 
-## How to Verify Our Findings
+## Automated Verifications Performed
 
-This document provides step-by-step instructions to independently verify the analysis results.
+This document shows what verifications were automatically performed by Vibe Verifier.
 
-### 1. Complexity Analysis Verification
+### 1. Complexity Analysis
 
-To verify the complexity metrics:
+**Status**: ✅ Automatically Performed
 
-```bash
-# Python projects
-pip install radon
-radon cc -s {{ metadata.path }} --total-average
-
-# JavaScript projects
-npm install -g complexity-report
-cr --format json {{ metadata.path }}
-```
-
-### 2. Security Analysis Verification
-
-{% if 'Python' in summary.languages_detected %}
-#### Python Security Checks
-```bash
-# Install and run bandit
-pip install bandit
-bandit -r {{ metadata.path }} -f json
-
-# Check for secrets
-pip install truffleHog
-trufflehog filesystem {{ metadata.path }}
-```
+Vibe Verifier analyzed complexity for:
+{% if complexity_analysis.by_language %}
+{% for language, results in complexity_analysis.by_language.items() %}
+- **{{ language }}**: {{ results.files_analyzed }} files analyzed
+  {%- if results.tool_used %} using {{ results.tool_used }}{% endif %}
+  {%- if results.note %} (Note: {{ results.note }}){% endif %}
+{% endfor %}
+{% else %}
+- **Python**: {{ complexity_analysis.metrics.files_analyzed }} files analyzed using Radon
 {% endif %}
 
-{% if 'JavaScript' in summary.languages_detected or 'TypeScript' in summary.languages_detected %}
-#### JavaScript/TypeScript Security Checks
-```bash
-# Install and run ESLint with security plugin
-npm install -g eslint eslint-plugin-security
-eslint {{ metadata.path }} --ext .js,.ts
+**Results Summary**:
+- Total Complexity: {{ complexity_analysis.metrics.total_complexity }}
+- Average Complexity: {{ "%.2f"|format(complexity_analysis.metrics.average_complexity) }}
+- Lines of Code: {{ complexity_analysis.metrics.total_lines }}
 
-# Run npm audit
-cd {{ metadata.path }}
-npm audit
-```
+### 2. Security Analysis
+
+**Status**: ✅ Automatically Performed
+
+{% if verification_analysis.security_summary %}
+Vibe Verifier ran the following security checks:
+
+{% for tool, results in verification_analysis.security_summary.items() %}
+- **{{ tool }}**:
+  {%- if results is mapping %}
+    {%- if results.status %} {{ results.status }}{% endif %}
+    {%- if results.total_issues is defined %} - {{ results.total_issues }} issues found{% endif %}
+  {%- else %}
+    {{ results }}
+  {%- endif %}
+{% endfor %}
+{% else %}
+No security analysis results available.
 {% endif %}
 
-{% if 'Go' in summary.languages_detected %}
-#### Go Security Checks
-```bash
-# Install and run gosec
-go install github.com/securego/gosec/v2/cmd/gosec@latest
-gosec ./...
+**Tools Used**:
+- Bandit (Python security linter) -
+  {%- if 'bandit' in verification_analysis.security_summary %} ✅ Run
+  {%- else %} ❌ Not available{% endif %}
+- Trufflehog (Secret detection) -
+  {%- if 'secrets' in verification_analysis.security_summary %} ✅ Run
+  {%- else %} ❌ Not available{% endif %}
+- ESLint Security Plugin -
+  {%- if 'eslint' in verification_analysis.security_summary %} ✅ Run
+  {%- else %} ❌ Not available{% endif %}
 
-# Run staticcheck
-go install honnef.co/go/tools/cmd/staticcheck@latest
-staticcheck ./...
-```
+
+### 3. Test Execution
+
+**Status**: ✅ Automatically Performed
+
+Vibe Verifier discovered and ran tests:
+
+**Test Frameworks Found**:
+{% if test_analysis.summary.frameworks_used %}
+{{ test_analysis.summary.frameworks_used|join(', ') }}
+{% else %}
+None detected
 {% endif %}
 
-### 3. Test Execution Verification
+**Test Results**:
+- Total Tests: {{ test_analysis.summary.total_tests }}
+- Passed: {{ test_analysis.summary.passed }}
+- Failed: {{ test_analysis.summary.failed }}
+- Success Rate: {{ "%.1f"|format(test_analysis.summary.success_rate) }}%
 
-{% for framework, detected in test_analysis.frameworks_detected.items() %}
-{% if detected %}
-#### {{ framework|title }} Tests
-```bash
-# Run {{ framework }} tests
-{% if framework == 'python' %}
-{% for fw, info in detected.items() %}
-{% if info.detected %}
-# {{ fw }} detected
-{{ info.command|join(' ')|replace('{output}', 'test_results.json') }}
-{% endif %}
+{% if test_analysis.test_results %}
+**Detailed Results by Framework**:
+{% for framework, results in test_analysis.test_results.items() %}
+- **{{ framework }}**:
+  {%- if results.summary %} {{ results.summary.total }} tests ({{ results.summary.passed }} passed)
+  {%- elif results.exit_code is defined %} Exit code: {{ results.exit_code }}
+  {%- endif %}
 {% endfor %}
 {% endif %}
-```
-{% endif %}
+
+### 4. Type Checking
+
+**Status**: ✅ Automatically Performed
+
+{% if verification_analysis.type_checking_summary %}
+**Type Checking Results**:
+{% for tool, results in verification_analysis.type_checking_summary.items() %}
+- **{{ tool }}**: {{ results.total_issues }} issues ({{ results.status }})
 {% endfor %}
-
-### 4. Type Checking Verification
-
-{% if 'Python' in summary.languages_detected %}
-#### Python Type Checking
-```bash
-pip install mypy
-mypy {{ metadata.path }}
-```
+{% else %}
+No type checking results available.
 {% endif %}
 
-{% if 'TypeScript' in summary.languages_detected %}
-#### TypeScript Type Checking
-```bash
-cd {{ metadata.path }}
-npx tsc --noEmit
-```
-{% endif %}
+### 5. Critical Issues Found
 
-### 5. Critical Issues Verification
+{% if critical_issues %}
+Vibe Verifier identified {{ critical_issues|length }} critical issues:
 
 {% for issue in critical_issues[:5] %}
-#### {{ loop.index }}. {{ issue.type|replace('_', ' ')|title }}
-
-**File**: `{{ issue.location }}`
-
-To verify this issue:
-```bash
-# Open the file and check line
-{% if 'complexity' in issue.type %}
-# Check complexity with radon
-radon cc {{ issue.location.split(':')[0] }} -s
-{% elif 'security' in issue.type %}
-# Run security scan on specific file
-bandit {{ issue.location.split(':')[0] }}
-{% elif 'test' in issue.type %}
-# Run tests to see failures
-pytest -v  # or appropriate test command
-{% endif %}
-```
-
+**{{ loop.index }}. {{ issue.type|replace('_', ' ')|title }}**
+- **Severity**: {{ issue.severity }}
+- **Location**: `{{ issue.location }}`
+- **Description**: {{ issue.description }}
 {% endfor %}
+{% else %}
+No critical issues found.
+{% endif %}
 
-### 6. Manual Code Review
+### 6. Formal Verification
 
-For comprehensive verification, perform manual code review focusing on:
+**Status**:
+{%- if verification_analysis.contracts or verification_analysis.assertions %}
+  ✅ Performed where tools available
+{%- else %}
+  ⏭️ Skipped (no formal verification tools found)
+{%- endif %}
 
-1. **High Complexity Areas**
-   {% for file in complexity_analysis.top_complex_files[:3] %}
-   - `{{ file.file }}` (Complexity: {{ file.complexity }})
-   {% endfor %}
+{% if verification_analysis.contracts %}
+**Contract Verification Results**:
+{% for tool, results in verification_analysis.contracts.items() %}
+- **{{ tool }}**: {{ results }}
+{% endfor %}
+{% endif %}
 
-2. **Security Hotspots**
-   - Authentication and authorization logic
-   - Input validation and sanitization
-   - Cryptographic operations
-   - File and network operations
+## Summary
 
-3. **Test Coverage Gaps**
-   - Uncovered critical paths
-   - Edge cases
-   - Error handling
+Vibe Verifier automatically performed comprehensive analysis including:
 
-### 7. Automated Verification Script
+✅ **Complexity Analysis** - Analyzed {{ complexity_analysis.metrics.files_analyzed }} files
+✅ **Security Scanning** - Ran available security tools
+✅ **Test Execution** - Discovered and ran {{ test_analysis.summary.total_tests }} tests
+✅ **Type Checking** - Performed static type analysis where applicable
+{%- if verification_analysis.contracts or verification_analysis.assertions %}
+✅ **Formal Verification** - Ran available verification tools
+{%- endif %}
 
-Save this as `verify_analysis.sh`:
+## Verification Philosophy
 
-```bash
-#!/bin/bash
-REPO_PATH="{{ metadata.path }}"
+Remember: **Trust but Verify**. While Vibe Verifier has automated many checks, you should:
 
-echo "Starting verification of analysis results..."
+1. Review critical issues identified
+2. Run additional specialized tools for your tech stack
+3. Perform manual code review for business logic
+4. Validate that automated results match your expectations
 
-# Detect languages
-echo "Detecting languages..."
-find "$REPO_PATH" -name "*.py" | head -1 && HAS_PYTHON=1
-find "$REPO_PATH" -name "*.js" -o -name "*.ts" | head -1 && HAS_JS=1
-find "$REPO_PATH" -name "*.go" | head -1 && HAS_GO=1
-
-# Run appropriate tools
-if [ "$HAS_PYTHON" ]; then
-    echo "Running Python analysis..."
-    which radon && radon cc "$REPO_PATH" -s --total-average
-    which bandit && bandit -r "$REPO_PATH"
-    which mypy && mypy "$REPO_PATH"
-fi
-
-if [ "$HAS_JS" ]; then
-    echo "Running JavaScript analysis..."
-    which eslint && eslint "$REPO_PATH"
-    cd "$REPO_PATH" && npm audit
-fi
-
-if [ "$HAS_GO" ]; then
-    echo "Running Go analysis..."
-    cd "$REPO_PATH"
-    which gosec && gosec ./...
-    which staticcheck && staticcheck ./...
-    go test ./...
-fi
-
-echo "Verification complete!"
-```
-
-Make it executable and run:
-```bash
-chmod +x verify_analysis.sh
-./verify_analysis.sh
-```
-
-## Understanding the Results
-
-### Complexity Scores
-- **A (1-5)**: Simple, easy to understand
-- **B (6-10)**: More complex, but manageable
-- **C (11-20)**: Complex, consider refactoring
-- **D (21-30)**: Very complex, refactoring recommended
-- **E (31-40)**: Extremely complex, refactoring strongly recommended
-- **F (41+)**: Untestable, refactoring required
-
-### Security Severity Levels
-- **Critical**: Immediate action required
-- **High**: Should be fixed soon
-- **Medium**: Should be reviewed and fixed
-- **Low**: Minor issues, fix when convenient
-
-### Test Success Rates
-- **90-100%**: Excellent
-- **80-90%**: Good
-- **70-80%**: Needs improvement
-- **Below 70%**: Critical attention needed
-
-## Next Steps
-
-1. Address critical issues first
-2. Improve test coverage for uncovered code
-3. Refactor high-complexity functions
-4. Set up CI/CD to run these checks automatically
-5. Establish code quality gates
-
-For questions about these results, consult your team's security and quality guidelines.
+The automated analysis provides a baseline - your expertise provides the context.
 """,
         }
 

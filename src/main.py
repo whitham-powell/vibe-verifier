@@ -11,6 +11,7 @@ from .analyzers.documentation_analyzer import ClaimVerifier, DocumentationAnalyz
 from .analyzers.git_history import GitHistoryAnalyzer
 from .reporters.report_generator import ReportGenerator, SummaryReporter
 from .testers.test_runner import UniversalTestRunner
+from .utils.security import get_safe_path, sanitize_results
 from .verifiers.formal_verifier import FormalVerifier
 from .verifiers.static_analyzer import StaticAnalyzer
 
@@ -38,7 +39,10 @@ class VibeVerifier:
 
     def run_analysis(self) -> Dict[str, Any]:
         """Run complete analysis pipeline."""
-        print(f"\n🔍 Starting Vibe Verifier analysis for: {self.repo_path}")
+        display_path = (
+            get_safe_path(self.repo_path) if self.config.get("sanitize", True) else self.repo_path
+        )
+        print(f"\n🔍 Starting Vibe Verifier analysis for: {display_path}")
         print("=" * 60)
 
         # Phase 0: Git History Analysis (if applicable)
@@ -150,7 +154,11 @@ class VibeVerifier:
 
         # Phase 8: Report Generation
         print("\n📝 Phase 8: Report Generation")
-        report_generator = ReportGenerator()
+        report_generator = ReportGenerator(
+            results_dir=self.config.get("output_dir"),
+            sanitize=self.config.get("sanitize", True),
+            redact_level=self.config.get("redact_level", "medium"),
+        )
         generated_reports = report_generator.generate_report(
             complexity_results,
             {**static_results, **verification_results},
@@ -163,7 +171,8 @@ class VibeVerifier:
 
         print("  Generated reports:")
         for format_type, path in generated_reports.items():
-            print(f"    - {format_type}: {path}")
+            display_path = get_safe_path(path) if self.config.get("sanitize", True) else path
+            print(f"    - {format_type}: {display_path}")
 
         # Print summary
         print("\n" + "=" * 60)
@@ -214,6 +223,19 @@ Examples:
 
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
 
+    parser.add_argument(
+        "--no-sanitize",
+        action="store_true",
+        help="Disable sanitization of sensitive information in reports",
+    )
+
+    parser.add_argument(
+        "--redact-level",
+        choices=["low", "medium", "high"],
+        default="medium",
+        help="Level of redaction for sensitive info (default: medium)",
+    )
+
     args = parser.parse_args()
 
     # Load configuration
@@ -232,6 +254,8 @@ Examples:
     config["skip_verification"] = args.skip_verification
     config["quick_mode"] = args.quick
     config["verbose"] = args.verbose
+    config["sanitize"] = not args.no_sanitize
+    config["redact_level"] = args.redact_level
 
     if args.output_dir:
         config["output_dir"] = args.output_dir
@@ -245,9 +269,19 @@ Examples:
         if config.get("save_raw_results", False):
             results_file = Path(config.get("output_dir", "reports")) / "raw_results.json"
             results_file.parent.mkdir(exist_ok=True)
+
+            # Sanitize results before saving if enabled
+            save_results = results
+            if config.get("sanitize", True):
+                save_results = sanitize_results(results, config.get("redact_level", "medium"))
+
             with open(results_file, "w") as f:
-                json.dump(results, f, indent=2, default=str)
-            print(f"\nRaw results saved to: {results_file}")
+                json.dump(save_results, f, indent=2, default=str)
+
+            safe_path = (
+                get_safe_path(results_file) if config.get("sanitize", True) else results_file
+            )
+            print(f"\nRaw results saved to: {safe_path}")
 
         # Exit with appropriate code
         if results.get("tests", {}).get("summary", {}).get("failed", 0) > 0:

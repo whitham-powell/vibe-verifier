@@ -18,7 +18,7 @@ class UniversalTestRunner:
         "python": {
             "pytest": {
                 "indicators": ["pytest.ini", "conftest.py", "test_*.py", "*_test.py"],
-                "command": ["pytest", "--json-report", "--json-report-file={output}", "-v"],
+                "command": ["pytest", "-v", "--tb=short"],
                 "config_files": ["pytest.ini", "setup.cfg", "tox.ini", "pyproject.toml"],
             },
             "unittest": {
@@ -455,7 +455,13 @@ class UniversalTestRunner:
 
         # Common patterns
         patterns = {
-            "pytest": [r"(\d+) passed", r"(\d+) failed", r"(\d+) skipped", r"(\d+) error"],
+            "pytest": {
+                "passed": r"(\d+) passed",
+                "failed": r"(\d+) failed",
+                "skipped": r"(\d+) skipped",
+                "error": r"(\d+) error",
+                "summary": r"=+ ([\d\s\w,]+) in [\d.]+",  # Example: ==== 5 failed, 25 passed ====
+            },
             "jest": [
                 r"Tests:\s+(\d+) passed",
                 r"Tests:\s+(\d+) failed",
@@ -469,18 +475,31 @@ class UniversalTestRunner:
 
         # Apply patterns
         if framework in patterns:
-            for pattern in patterns[framework]:
-                matches = re.findall(pattern, stdout, re.MULTILINE | re.IGNORECASE)
-                if matches:
-                    # Update summary based on pattern
-                    if "passed" in pattern or "passing" in pattern:
-                        summary["passed"] = int(matches[0]) if matches else 0
-                    elif "failed" in pattern or "failing" in pattern:
-                        summary["failed"] = int(matches[0]) if matches else 0
-                    elif "skipped" in pattern or "pending" in pattern or "ignored" in pattern:
-                        summary["skipped"] = int(matches[0]) if matches else 0
-                    elif "total" in pattern:
-                        summary["total"] = int(matches[0]) if matches else 0
+            framework_patterns = patterns[framework]
+
+            # Handle dict patterns (new format)
+            if isinstance(framework_patterns, dict):
+                for key, pattern in framework_patterns.items():
+                    matches = re.findall(pattern, stdout, re.MULTILINE | re.IGNORECASE)
+                    if matches and key in ["passed", "failed", "skipped", "error"]:
+                        if key == "error":
+                            summary["failed"] += int(matches[0])
+                        else:
+                            summary[key] = int(matches[0])
+            else:
+                # Handle list patterns (old format)
+                for pattern in framework_patterns:
+                    matches = re.findall(pattern, stdout, re.MULTILINE | re.IGNORECASE)
+                    if matches:
+                        # Update summary based on pattern
+                        if "passed" in pattern or "passing" in pattern:
+                            summary["passed"] = int(matches[0]) if matches else 0
+                        elif "failed" in pattern or "failing" in pattern:
+                            summary["failed"] = int(matches[0]) if matches else 0
+                        elif "skipped" in pattern or "pending" in pattern or "ignored" in pattern:
+                            summary["skipped"] = int(matches[0]) if matches else 0
+                        elif "total" in pattern:
+                            summary["total"] = int(matches[0]) if matches else 0
 
         # Calculate total if not found
         if summary["total"] == 0:

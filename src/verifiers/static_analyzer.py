@@ -3,6 +3,7 @@
 import ast
 import json
 import os
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Any, Dict, List
@@ -251,6 +252,16 @@ class StaticAnalyzer:
     def _check_secrets(self) -> None:
         """Check for hardcoded secrets."""
         try:
+            # Check if trufflehog is available
+            if not shutil.which("trufflehog"):
+                self.results["security"]["secrets"] = {
+                    "status": "skipped",
+                    "reason": "trufflehog not installed",
+                    "found": 0,
+                    "details": [],
+                }
+                return
+
             # Use truffleHog or similar
             result = subprocess.run(
                 ["trufflehog", "filesystem", str(self.repo_path), "--json"],

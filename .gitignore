@@ -28,6 +28,7 @@ ENV/
 env/
 
 # Testing
+Testing/
 .tox/
 .coverage
 .coverage.*
@@ -35,6 +36,16 @@ env/
 .pytest_cache/
 htmlcov/
 .hypothesis/
+test_results.json
+test-results/
+test-reports/
+*test-output*
+*.test-results
+pytest_cache/
+junit.xml
+nosetests.xml
+coverage.xml
+*.cover
 
 # IDEs
 .vscode/

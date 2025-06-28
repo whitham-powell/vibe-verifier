@@ -307,10 +307,14 @@ class GitHistoryAnalyzer:
 
     def _analyze_contributors(self) -> Dict[str, Any]:
         """Analyze contributor patterns and expertise."""
-        # Get contributor statistics
+        # First try with time filter, fall back to all time if no results
         contributors = self._run_git_command(
-            ["git", "shortlog", "-sn", "--no-merges", "--since", "1 year ago"]
+            ["git", "shortlog", "-sn", "--no-merges", "--since", "1 year ago", "HEAD"]
         )
+
+        # If no contributors found (young repo), try without time filter
+        if not contributors or contributors.strip() == "":
+            contributors = self._run_git_command(["git", "shortlog", "-sn", "--no-merges", "HEAD"])
 
         if not contributors:
             return {}
