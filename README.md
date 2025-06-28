@@ -1,5 +1,15 @@
 # Vibe Verifier
 
+> ⚠️ **WORK IN PROGRESS**: This project is under active development and has not yet been fully tested or verified. The tool itself has not undergone the same rigorous verification process it applies to other codebases. Use with caution and expect breaking changes.
+>
+> 🤝 **WE NEED YOUR HELP**: We are actively encouraging and expecting issues with this project! Please help us make Vibe Verifier more robust by:
+> - **Reporting bugs** and edge cases you encounter
+> - **Creating issues** for any problems or suggestions
+> - **Submitting pull requests** to fix issues or add features
+> - **Contributing** whether you're a human developer or an AI agent - all contributions are welcome!
+>
+> Your feedback and contributions are essential to achieving our goal of building a truly reliable code verification tool. See our [Contributing Guide](CONTRIBUTING.md) for details.
+
 A comprehensive, language-agnostic tool for analyzing, verifying, and testing codebases. Vibe Verifier performs complexity analysis, formal verification, and automated testing to validate the claims and capabilities of any given repository.
 
 ## Core Philosophy: Trust But Verify
@@ -336,8 +346,9 @@ Vibe Verifier:
 ## Getting Help
 
 - **Issues**: https://github.com/vibes/vibe-verifier/issues
-- **Documentation**: https://github.com/vibes/vibe-verifier/wiki
+- **Documentation**: (Wiki coming soon - for now, see this README)
 - **Examples**: See the `examples/` directory in the repository
+- **Contributing**: See our [Contributing Guide](CONTRIBUTING.md)
 
 ## License
 

@@ -32,9 +32,10 @@ classifiers = [
 
 [project.urls]
 Homepage = "https://github.com/vibes/vibe-verifier"
-Documentation = "https://github.com/vibes/vibe-verifier/wiki"
+Documentation = "https://github.com/vibes/vibe-verifier/blob/main/README.md"
 Repository = "https://github.com/vibes/vibe-verifier"
 Issues = "https://github.com/vibes/vibe-verifier/issues"
+Contributing = "https://github.com/vibes/vibe-verifier/blob/main/CONTRIBUTING.md"
 
 [project.scripts]
 vibe-verifier = "src.main:main"
