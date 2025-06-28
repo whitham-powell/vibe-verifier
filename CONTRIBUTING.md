@@ -1,0 +1,218 @@
+# Contributing to Vibe Verifier
+
+Thank you for your interest in contributing to Vibe Verifier! As a work-in-progress project, we actively encourage and expect contributions to help us build a robust code verification tool.
+
+## We Need Your Help!
+
+Vibe Verifier is in active development, and we're counting on the community to help us:
+- **Find bugs** and edge cases
+- **Improve documentation** and examples
+- **Add new features** and language support
+- **Fix issues** and enhance existing functionality
+- **Test the tool** on diverse codebases
+
+**All contributors are welcome** - whether you're a human developer or an AI agent!
+
+## How to Contribute
+
+### Reporting Issues
+
+We **expect** issues! Finding problems helps us improve. When reporting issues:
+
+1. **Check existing issues** to avoid duplicates
+2. **Use a clear title** that summarizes the problem
+3. **Provide details**:
+   - What you were trying to do
+   - What actually happened
+   - Error messages (if any)
+   - Your environment (OS, Python version)
+   - Steps to reproduce
+
+Example issue template:
+```markdown
+**Description**: Brief description of the issue
+
+**Steps to Reproduce**:
+1. Run `vibe-verifier /path/to/repo`
+2. Observe error in output
+3. ...
+
+**Expected Behavior**: What should happen
+
+**Actual Behavior**: What actually happened
+
+**Environment**:
+- OS: Ubuntu 22.04
+- Python: 3.10.5
+- Vibe Verifier version: 0.1.0
+```
+
+### Submitting Pull Requests
+
+1. **Fork the repository**
+   ```bash
+   git clone https://github.com/vibes/vibe-verifier.git
+   cd vibe-verifier
+   git remote add upstream https://github.com/vibes/vibe-verifier.git
+   ```
+
+2. **Create a feature branch**
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+
+3. **Set up development environment**
+   ```bash
+   # Using uv (recommended - much faster!)
+   ./scripts/setup-dev-uv.sh
+   
+   # Or using pip
+   ./scripts/setup-dev.sh
+   ```
+
+4. **Make your changes**
+   - Follow the existing code style
+   - Add tests for new functionality
+   - Update documentation as needed
+   - Follow the "trust but verify" philosophy
+
+5. **Run tests and checks**
+   ```bash
+   # Run all tests
+   make test
+   
+   # Run linting
+   make lint
+   
+   # Format code
+   make format
+   ```
+
+6. **Commit your changes**
+   ```bash
+   # Use conventional commit format
+   git commit -m "feat: add support for Ruby language detection"
+   git commit -m "fix: handle empty test directories gracefully"
+   git commit -m "docs: update contributing guidelines"
+   ```
+
+7. **Push and create PR**
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+   Then create a pull request on GitHub with:
+   - Clear description of changes
+   - Link to related issues
+   - Screenshots/examples if applicable
+
+## Development Guidelines
+
+### Code Style
+
+- Follow PEP 8 for Python code
+- Use type hints for all functions
+- Write docstrings for public functions
+- Keep functions focused and testable
+
+### Testing Philosophy
+
+Remember our core principle: **trust but verify**. When adding features:
+
+1. **Never trust inputs** - validate everything
+2. **Write tests first** when possible
+3. **Test edge cases** thoroughly
+4. **Mock external dependencies** in unit tests
+
+### Adding New Language Support
+
+To add support for a new programming language:
+
+1. Update `LanguageDetector` in `src/analyzers/complexity.py`
+2. Add test framework detection in `src/testers/test_runner.py`
+3. Add verification tools in `src/verifiers/formal_verifier.py`
+4. Include example projects in tests
+5. Update documentation
+
+### Commit Message Format
+
+We use conventional commits:
+
+- `feat:` New feature
+- `fix:` Bug fix
+- `docs:` Documentation changes
+- `style:` Code style changes (formatting, etc.)
+- `refactor:` Code refactoring
+- `test:` Test additions or changes
+- `chore:` Maintenance tasks
+
+## Areas We Need Help
+
+### High Priority
+
+1. **Language Support**
+   - Swift, Kotlin, Scala support
+   - Better C++ analysis
+   - Framework-specific analysis (React, Django, etc.)
+
+2. **Verification Tools**
+   - Integration with more formal verification tools
+   - Improved security scanning
+   - Performance profiling
+
+3. **Testing**
+   - More test cases for edge scenarios
+   - Cross-platform testing
+   - Large repository performance testing
+
+### Documentation
+
+- Usage examples for different scenarios
+- Video tutorials
+- Translation to other languages
+- Architecture deep-dives
+
+### Infrastructure
+
+- CI/CD improvements
+- Docker support
+- Package distribution (Homebrew, AUR, etc.)
+- Performance optimizations
+
+## For AI Agent Contributors
+
+We welcome contributions from AI agents! When contributing:
+
+1. **Clearly identify** that you're an AI agent in PRs/issues
+2. **Provide context** about your analysis or changes
+3. **Include verification steps** for your contributions
+4. **Follow the same guidelines** as human contributors
+
+Example AI agent PR description:
+```markdown
+This PR was generated by [AI Agent Name].
+
+**Analysis**: Detected missing error handling in test_runner.py
+**Solution**: Added try-except blocks with appropriate error messages
+**Verification**: Run `pytest tests/test_test_runner.py` to verify fixes
+```
+
+## Questions or Need Help?
+
+- **Discord/Slack**: [Join our community]
+- **GitHub Discussions**: Ask questions and share ideas
+- **Issue Tracker**: Report bugs or request features
+
+## Recognition
+
+All contributors will be recognized in our:
+- Contributors list
+- Release notes
+- Project documentation
+
+## License
+
+By contributing, you agree that your contributions will be licensed under the MIT License.
+
+---
+
+Remember: **We expect issues!** Every bug report, failed edge case, and improvement suggestion helps us build a better tool. Don't hesitate to contribute - your input is valuable whether you're fixing a typo or adding a major feature.
