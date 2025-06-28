@@ -45,7 +45,7 @@ When adding new analyzers or features:
 - Python 3.8+
 - Git
 - Make (optional but recommended)
-- Virtual environment tool (venv, virtualenv, or conda)
+- uv (recommended) or pip
 
 ### Initial Setup
 
@@ -55,23 +55,95 @@ git clone https://github.com/vibes/vibe-verifier.git
 cd vibe-verifier
 ```
 
-2. Create and activate a virtual environment:
+2. **Recommended: Use uv for fast package management**
 ```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# Install uv if not already installed
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Run the uv setup script
+./scripts/setup-dev-uv.sh
 ```
 
-3. Install in development mode:
+This script will:
+- Install uv (if not present)
+- Create a virtual environment with Python 3.10
+- Install all dependencies (10-100x faster than pip)
+- Set up pre-commit hooks
+- Verify the installation
+
+### Alternative Setup Methods
+
+#### Using traditional pip:
 ```bash
-make install-dev
-# Or manually:
+./scripts/setup-dev.sh
+```
+
+#### Manual setup with uv:
+```bash
+# Create virtual environment with uv
+uv venv .venv --python 3.10
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install dependencies with uv (much faster!)
+uv pip install -r requirements-dev.txt
+uv pip install -e .
+
+# Set up pre-commit hooks
+pre-commit install
+```
+
+#### Manual setup with pip:
+```bash
+# Create virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Install dependencies (slower)
+pip install --upgrade pip setuptools wheel
+pip install -r requirements-dev.txt
 pip install -e .
-pip install -r requirements.txt
-pip install pytest pytest-cov pytest-mock
+
+# Set up pre-commit hooks
+pre-commit install
 ```
 
-4. Run initial tests to verify setup:
+### Environment Management Options
+
+1. **Virtual Environment (Recommended)**
+   - Isolated from system Python
+   - Dependencies don't conflict with system packages
+   - Easy to recreate/delete
+
+2. **direnv (Automatic Activation)**
+   ```bash
+   # Install direnv
+   brew install direnv  # macOS
+   sudo apt install direnv  # Ubuntu
+   
+   # Enable in shell
+   echo 'eval "$(direnv hook bash)"' >> ~/.bashrc
+   
+   # Allow the .envrc
+   direnv allow
+   ```
+
+3. **pyenv (Multiple Python Versions)**
+   ```bash
+   # Install Python 3.10.12 (specified in .python-version)
+   pyenv install 3.10.12
+   pyenv local 3.10.12
+   ```
+
+### Verify Setup
+
 ```bash
+# Check Python version (should be 3.8+)
+python --version
+
+# Check vibe-verifier is installed
+python -c "import src; print(src.__version__)"
+
+# Run tests
 make test
 ```
 

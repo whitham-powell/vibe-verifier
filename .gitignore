@@ -28,6 +28,11 @@ venv/
 ENV/
 env/
 .venv
+.venv/
+
+# direnv
+.direnv/
+.envrc.local
 
 # IDE
 .vscode/

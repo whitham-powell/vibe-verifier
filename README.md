@@ -45,6 +45,10 @@ vibe-verifier /path/to/your/repo
 ### Install from PyPI
 
 ```bash
+# Using uv (recommended - 10-100x faster)
+uv pip install vibe-verifier
+
+# Or using pip
 pip install vibe-verifier
 ```
 
@@ -53,7 +57,24 @@ pip install vibe-verifier
 ```bash
 git clone https://github.com/vibes/vibe-verifier.git
 cd vibe-verifier
+
+# Using uv (recommended)
+uv pip install -e .
+
+# Or using pip
 pip install -e .
+```
+
+### Install uv (Recommended Package Manager)
+
+uv is a blazing fast Python package manager written in Rust:
+
+```bash
+# macOS/Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Windows
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
 ### Optional Dependencies
@@ -293,6 +314,16 @@ Create a `vibe-verifier.json` file:
 - `1` - Test failures detected
 - `2` - Documentation claims failed verification
 - `3` - Analysis error occurred
+
+## Performance Tips
+
+For faster analysis and dependency installation, we recommend using [uv](https://github.com/astral-sh/uv):
+
+- **10-100x faster** package installation
+- **Better dependency resolution**
+- **Drop-in pip replacement**
+
+Install uv with: `curl -LsSf https://astral.sh/uv/install.sh | sh`
 
 ## Privacy & Security
 
