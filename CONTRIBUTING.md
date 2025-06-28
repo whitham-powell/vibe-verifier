@@ -65,7 +65,7 @@ Example issue template:
    ```bash
    # Using uv (recommended - much faster!)
    ./scripts/setup-dev-uv.sh
-   
+
    # Or using pip
    ./scripts/setup-dev.sh
    ```
@@ -80,10 +80,10 @@ Example issue template:
    ```bash
    # Run all tests
    make test
-   
+
    # Run linting
    make lint
-   
+
    # Format code
    make format
    ```

@@ -1,3 +1,3 @@
-"""Vibe Verifier - A tool for complexity analysis, formal verification, and testing of codebases."""
+"""Vibe Verifier - Tool for complexity analysis, verification, and testing."""
 
 __version__ = "0.1.0"

@@ -27,27 +27,21 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    # Core dependencies
-    "radon>=5.1.0",
-    "markdown>=3.4.0",
-    "jinja2>=3.1.0",
-    "fpdf2>=2.7.0",
-    "beautifulsoup4>=4.12.0",
-    "pyyaml>=6.0",
-    "toml>=0.10.2",
-    # Static analysis
-    "pylint>=2.17.0",
-    "mypy>=1.5.0",
-    "bandit>=1.7.0",
-    "safety>=2.3.0",
-    # Testing
-    "pytest>=7.4.0",
-    "pytest-json-report>=1.5.0",
-    "coverage>=7.3.0",
-    # Formatting
-    "black>=23.7.0",
-    "isort>=5.12.0",
-    "flake8>=6.1.0",
+    # Core dependencies for code analysis
+    "radon>=5.1.0",           # Code complexity metrics
+    "markdown>=3.4.0",        # Parse markdown documentation
+    "beautifulsoup4>=4.12.0", # Parse HTML documentation
+    "pyyaml>=6.0",           # Parse YAML configs
+    "toml>=0.10.2",          # Parse TOML configs
+    # Report generation
+    "jinja2>=3.1.0",         # Template engine for reports
+    "fpdf2>=2.7.0",          # PDF report generation
+    # Static analysis tools for verification
+    "pylint>=2.17.0",        # Python code linting
+    "mypy>=1.5.0",           # Python type checking
+    "bandit>=1.7.0",         # Security vulnerability scanning
+    "safety>=2.3.0",         # Dependency vulnerability checking
+    "flake8>=6.1.0",         # Python code quality checking
 ]
 
 [project.urls]
@@ -59,25 +53,41 @@ Contributing = "https://github.com/vibes/vibe-verifier/blob/main/CONTRIBUTING.md
 
 [project.optional-dependencies]
 dev = [
+    # Testing vibe-verifier itself
+    "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
     "pytest-mock>=3.11.0",
     "pytest-timeout>=2.1.0",
+    "pytest-json-report>=1.5.0",
+    "coverage>=7.3.0",
     "hypothesis>=6.82.0",
+    # Code formatting for vibe-verifier development
+    "black>=23.7.0",
+    "isort>=5.12.0",
+    # Development tools
     "ipython>=8.14.0",
     "ipdb>=0.13.13",
     "pre-commit>=3.3.3",
+    # Build and release
     "build>=0.10.0",
     "twine>=4.0.2",
+    # Type stubs for development
+    "types-toml>=0.10.0",
+    "types-PyYAML>=6.0.0",
+    "types-Markdown>=3.0.0",
+    "types-beautifulsoup4>=4.12.0",
+    "types-fpdf2>=2.7.0",
 ]
 
 [project.scripts]
 vibe-verifier = "src.main:main"
 
-[tool.setuptools]
-packages = ["src"]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
 
 [tool.setuptools.package-data]
-src = ["*.json", "*.yaml", "*.yml"]
+"*" = ["*.json", "*.yaml", "*.yml"]
 
 [tool.black]
 line-length = 100
@@ -124,6 +134,18 @@ warn_no_return = true
 warn_unreachable = true
 strict_equality = true
 
+# Ignore missing imports only for packages without type stubs
+[[tool.mypy.overrides]]
+module = ["radon", "radon.*", "jinja2", "jinja2.*", "markdown", "markdown.*", "bs4", "bs4.*", "fpdf", "fpdf.*"]
+ignore_missing_imports = true
+
+# Less strict type checking for test files
+[[tool.mypy.overrides]]
+module = ["tests.*", "conftest"]
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = true
+
 [tool.pytest.ini_options]
 minversion = "6.0"
 addopts = "-ra -q --strict-markers"
@@ -153,7 +175,8 @@ exclude_lines = [
     "if TYPE_CHECKING:",
 ]
 
-[tool.pylint.messages_control]
+[tool.pylint]
+max-line-length = 100
 disable = [
     "C0330",  # Wrong hanging indentation
     "C0326",  # No space allowed around keyword argument assignment
@@ -163,8 +186,12 @@ disable = [
     "R0915",  # Too many statements
 ]
 
-[tool.pylint.format]
+[tool.flake8]
 max-line-length = 100
+extend-ignore = ["E203", "W503", "D202"]
+# E203: whitespace before ':' (conflicts with black)
+# W503: line break before binary operator (conflicts with black)
+# D202: no blank lines after function docstring (conflicts with black)
 
 [tool.bandit]
 exclude_dirs = ["tests", "venv", ".venv"]

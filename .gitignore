@@ -55,6 +55,3 @@ dmypy.json
 # Distribution
 pip-log.txt
 pip-delete-this-directory.txt
-
-# Pre-commit
-.pre-commit-config.yaml

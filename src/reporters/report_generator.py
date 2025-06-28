@@ -1,93 +1,94 @@
 """Comprehensive report generation module."""
 
 import json
-import os
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Any, Optional
-import markdown
+from typing import Any, Dict, List, Optional
+
 import jinja2
 from fpdf import FPDF
 
 
 class ReportGenerator:
     """Generates human-readable reports from analysis results."""
-    
-    def __init__(self, results_dir: str = None):
+
+    def __init__(self, results_dir: Optional[str] = None):
+        """Initialize the ReportGenerator.
+
+        Args:
+            results_dir: Optional directory path for saving reports.
+        """
         self.results_dir = Path(results_dir) if results_dir else Path.cwd() / "reports"
         self.results_dir.mkdir(exist_ok=True)
-        
+
         # Set up Jinja2 environment
-        self.jinja_env = jinja2.Environment(
-            loader=jinja2.DictLoader(self._get_templates())
-        )
-    
-    def generate_report(self, 
-                       complexity_results: Dict[str, Any],
-                       verification_results: Dict[str, Any],
-                       test_results: Dict[str, Any],
-                       repo_path: str,
-                       output_format: str = "all") -> Dict[str, str]:
+        self.jinja_env = jinja2.Environment(loader=jinja2.DictLoader(self._get_templates()))
+
+    def generate_report(
+        self,
+        complexity_results: Dict[str, Any],
+        verification_results: Dict[str, Any],
+        test_results: Dict[str, Any],
+        repo_path: str,
+        output_format: str = "all",
+    ) -> Dict[str, str]:
         """Generate comprehensive report in multiple formats."""
-        
         # Prepare report data
         report_data = self._prepare_report_data(
-            complexity_results,
-            verification_results,
-            test_results,
-            repo_path
+            complexity_results, verification_results, test_results, repo_path
         )
-        
+
         # Generate reports in different formats
         generated_files = {}
-        
+
         if output_format in ["all", "markdown"]:
             md_file = self._generate_markdown_report(report_data)
             generated_files["markdown"] = str(md_file)
-        
+
         if output_format in ["all", "html"]:
             html_file = self._generate_html_report(report_data)
             generated_files["html"] = str(html_file)
-        
+
         if output_format in ["all", "json"]:
             json_file = self._generate_json_report(report_data)
             generated_files["json"] = str(json_file)
-        
+
         if output_format in ["all", "pdf"]:
             pdf_file = self._generate_pdf_report(report_data)
             generated_files["pdf"] = str(pdf_file)
-        
+
         # Generate verification steps
         steps_file = self._generate_verification_steps(report_data)
         generated_files["verification_steps"] = str(steps_file)
-        
+
         return generated_files
-    
-    def _prepare_report_data(self, 
-                            complexity: Dict[str, Any],
-                            verification: Dict[str, Any],
-                            tests: Dict[str, Any],
-                            repo_path: str) -> Dict[str, Any]:
+
+    def _prepare_report_data(
+        self,
+        complexity: Dict[str, Any],
+        verification: Dict[str, Any],
+        tests: Dict[str, Any],
+        repo_path: str,
+    ) -> Dict[str, Any]:
         """Prepare and structure report data."""
-        
         timestamp = datetime.now().isoformat()
         repo_name = Path(repo_path).name
-        
+
         # Calculate overall health score
         health_score = self._calculate_health_score(complexity, verification, tests)
-        
+
         # Identify critical issues
         critical_issues = self._identify_critical_issues(complexity, verification, tests)
-        
+
         # Generate recommendations
         recommendations = self._generate_recommendations(complexity, verification, tests)
-        
+
         return {
             "metadata": {
                 "repository": repo_name,
                 "path": repo_path,
                 "timestamp": timestamp,
-                "analysis_version": "1.0.0"
+                "analysis_version": "1.0.0",
             },
             "summary": {
                 "health_score": health_score,
@@ -95,30 +96,32 @@ class ReportGenerator:
                 "total_files_analyzed": complexity.get("summary", {}).get("total_files", 0),
                 "languages_detected": self._get_languages(complexity),
                 "test_coverage_available": bool(tests.get("coverage", {})),
-                "formal_verification_performed": bool(verification.get("contracts", {}))
+                "formal_verification_performed": bool(verification.get("contracts", {})),
             },
             "complexity_analysis": self._format_complexity_results(complexity),
             "verification_analysis": self._format_verification_results(verification),
             "test_analysis": self._format_test_results(tests),
             "critical_issues": critical_issues,
             "recommendations": recommendations,
-            "detailed_findings": self._compile_detailed_findings(complexity, verification, tests)
+            "detailed_findings": self._compile_detailed_findings(complexity, verification, tests),
         }
-    
-    def _calculate_health_score(self, complexity: Dict, verification: Dict, tests: Dict) -> float:
+
+    def _calculate_health_score(
+        self, complexity: Dict[str, Any], verification: Dict[str, Any], tests: Dict[str, Any]
+    ) -> float:
         """Calculate overall repository health score (0-100)."""
         score = 100.0
-        
+
         # Complexity factors
         avg_complexity = complexity.get("summary", {}).get("average_complexity", 0)
         if avg_complexity > 10:
             score -= min(20, (avg_complexity - 10) * 2)
-        
+
         complexity_dist = complexity.get("summary", {}).get("complexity_distribution", {})
         high_complexity = complexity_dist.get("E (31-40)", 0) + complexity_dist.get("F (41+)", 0)
         if high_complexity > 0:
             score -= min(15, high_complexity * 3)
-        
+
         # Test factors
         test_summary = tests.get("summary", {})
         if test_summary:
@@ -126,167 +129,224 @@ class ReportGenerator:
             score -= (100 - success_rate) * 0.3
         else:
             score -= 20  # No tests found
-        
+
         # Verification factors
         security_issues = 0
         for lang_results in verification.get("security", {}).values():
             if isinstance(lang_results, dict):
                 security_issues += len(lang_results.get("results", []))
-        
+
         if security_issues > 0:
             score -= min(25, security_issues * 2)
-        
+
         return max(0, score)
-    
-    def _identify_critical_issues(self, complexity: Dict, verification: Dict, tests: Dict) -> List[Dict[str, Any]]:
+
+    def _identify_critical_issues(
+        self, complexity: Dict[str, Any], verification: Dict[str, Any], tests: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
         """Identify critical issues that need immediate attention."""
         critical_issues = []
-        
+
         # High complexity functions
         for file_path, metrics in complexity.get("files", {}).items():
             if isinstance(metrics, dict) and "functions" in metrics:
                 for func in metrics["functions"]:
                     if func.get("complexity", 0) > 20:
-                        critical_issues.append({
-                            "type": "high_complexity",
-                            "severity": "high",
-                            "location": f"{file_path}:{func.get('lineno', 'unknown')}",
-                            "description": f"Function '{func.get('name')}' has complexity {func.get('complexity')} (threshold: 20)",
-                            "recommendation": "Refactor this function to reduce complexity"
-                        })
-        
+                        critical_issues.append(
+                            {
+                                "type": "high_complexity",
+                                "severity": "high",
+                                "location": f"{file_path}:{func.get('lineno', 'unknown')}",
+                                "description": (
+                                    f"Function '{func.get('name')}' has complexity "
+                                    f"{func.get('complexity')} (threshold: 20)"
+                                ),
+                                "recommendation": "Refactor this function to reduce complexity",
+                            }
+                        )
+
         # Security vulnerabilities
         security_results = verification.get("security", {})
-        
+
         # Check bandit results
         bandit_results = security_results.get("bandit", {}).get("results", [])
         for issue in bandit_results:
             if issue.get("issue_severity", "").upper() in ["HIGH", "MEDIUM"]:
-                critical_issues.append({
-                    "type": "security_vulnerability",
-                    "severity": issue.get("issue_severity", "unknown").lower(),
-                    "location": f"{issue.get('filename')}:{issue.get('line_number')}",
-                    "description": issue.get("issue_text", "Security issue detected"),
-                    "recommendation": "Review and fix this security vulnerability"
-                })
-        
+                critical_issues.append(
+                    {
+                        "type": "security_vulnerability",
+                        "severity": issue.get("issue_severity", "unknown").lower(),
+                        "location": f"{issue.get('filename')}:{issue.get('line_number')}",
+                        "description": issue.get("issue_text", "Security issue detected"),
+                        "recommendation": "Review and fix this security vulnerability",
+                    }
+                )
+
         # Check for secrets
         secrets = security_results.get("secrets", {})
         if secrets.get("found", 0) > 0:
             for secret in secrets.get("details", []):
-                critical_issues.append({
-                    "type": "hardcoded_secret",
-                    "severity": "critical",
-                    "location": secret.get("file", "unknown"),
-                    "description": f"Potential {secret.get('type', 'secret')} found",
-                    "recommendation": "Remove hardcoded secrets and use environment variables or secret management systems"
-                })
-        
+                critical_issues.append(
+                    {
+                        "type": "hardcoded_secret",
+                        "severity": "critical",
+                        "location": secret.get("file", "unknown"),
+                        "description": f"Potential {secret.get('type', 'secret')} found",
+                        "recommendation": (
+                            "Remove hardcoded secrets and use environment variables "
+                            "or secret management systems"
+                        ),
+                    }
+                )
+
         # Failed tests
         test_summary = tests.get("summary", {})
         if test_summary.get("failed", 0) > 0:
-            critical_issues.append({
-                "type": "test_failures",
-                "severity": "high",
-                "location": "test suite",
-                "description": f"{test_summary.get('failed')} tests are failing",
-                "recommendation": "Fix failing tests to ensure code reliability"
-            })
-        
+            critical_issues.append(
+                {
+                    "type": "test_failures",
+                    "severity": "high",
+                    "location": "test suite",
+                    "description": f"{test_summary.get('failed')} tests are failing",
+                    "recommendation": "Fix failing tests to ensure code reliability",
+                }
+            )
+
         # Type checking errors
         type_errors = verification.get("type_checking", {})
         for tool, results in type_errors.items():
             if isinstance(results, dict) and results.get("total_issues", 0) > 0:
-                critical_issues.append({
-                    "type": "type_errors",
-                    "severity": "medium",
-                    "location": f"{tool} type checking",
-                    "description": f"{results.get('total_issues')} type errors found",
-                    "recommendation": "Fix type errors to improve code reliability"
-                })
-        
+                critical_issues.append(
+                    {
+                        "type": "type_errors",
+                        "severity": "medium",
+                        "location": f"{tool} type checking",
+                        "description": f"{results.get('total_issues')} type errors found",
+                        "recommendation": "Fix type errors to improve code reliability",
+                    }
+                )
+
         return critical_issues
-    
-    def _generate_recommendations(self, complexity: Dict, verification: Dict, tests: Dict) -> List[Dict[str, str]]:
+
+    def _generate_recommendations(
+        self, complexity: Dict[str, Any], verification: Dict[str, Any], tests: Dict[str, Any]
+    ) -> List[Dict[str, str]]:
         """Generate actionable recommendations based on analysis."""
         recommendations = []
-        
+
         # Test coverage recommendations
         if not tests.get("discovered_frameworks"):
-            recommendations.append({
-                "category": "Testing",
-                "priority": "high",
-                "recommendation": "No test framework detected. Implement unit tests to ensure code reliability.",
-                "action": "Set up a testing framework appropriate for your language (pytest, jest, JUnit, etc.)"
-            })
+            recommendations.append(
+                {
+                    "category": "Testing",
+                    "priority": "high",
+                    "recommendation": (
+                        "No test framework detected. Implement unit tests to ensure "
+                        "code reliability."
+                    ),
+                    "action": (
+                        "Set up a testing framework appropriate for your language "
+                        "(pytest, jest, JUnit, etc.)"
+                    ),
+                }
+            )
         elif tests.get("summary", {}).get("total_tests", 0) < 10:
-            recommendations.append({
-                "category": "Testing",
-                "priority": "medium",
-                "recommendation": "Low test count detected. Increase test coverage.",
-                "action": "Write more comprehensive tests covering edge cases and main functionality"
-            })
-        
+            recommendations.append(
+                {
+                    "category": "Testing",
+                    "priority": "medium",
+                    "recommendation": "Low test count detected. Increase test coverage.",
+                    "action": (
+                        "Write more comprehensive tests covering edge cases and "
+                        "main functionality"
+                    ),
+                }
+            )
+
         # Complexity recommendations
         avg_complexity = complexity.get("summary", {}).get("average_complexity", 0)
         if avg_complexity > 15:
-            recommendations.append({
-                "category": "Code Quality",
-                "priority": "high",
-                "recommendation": "High average code complexity detected.",
-                "action": "Refactor complex functions, extract methods, and simplify logic"
-            })
-        
+            recommendations.append(
+                {
+                    "category": "Code Quality",
+                    "priority": "high",
+                    "recommendation": "High average code complexity detected.",
+                    "action": "Refactor complex functions, extract methods, and simplify logic",
+                }
+            )
+
         # Security recommendations
         if not verification.get("security"):
-            recommendations.append({
-                "category": "Security",
-                "priority": "high",
-                "recommendation": "No security analysis performed.",
-                "action": "Run security scanning tools (bandit, gosec, etc.) appropriate for your language"
-            })
-        
+            recommendations.append(
+                {
+                    "category": "Security",
+                    "priority": "high",
+                    "recommendation": "No security analysis performed.",
+                    "action": (
+                        "Run security scanning tools (bandit, gosec, etc.) appropriate "
+                        "for your language"
+                    ),
+                }
+            )
+
         # Documentation recommendations
-        missing_docs = sum(1 for f in complexity.get("files", {}).values() 
-                          if isinstance(f, dict) and f.get("comments", 0) < f.get("sloc", 1) * 0.1)
+        missing_docs = sum(
+            1
+            for f in complexity.get("files", {}).values()
+            if isinstance(f, dict) and f.get("comments", 0) < f.get("sloc", 1) * 0.1
+        )
         if missing_docs > 5:
-            recommendations.append({
-                "category": "Documentation",
-                "priority": "medium",
-                "recommendation": "Many files lack sufficient documentation.",
-                "action": "Add docstrings and comments to improve code maintainability"
-            })
-        
+            recommendations.append(
+                {
+                    "category": "Documentation",
+                    "priority": "medium",
+                    "recommendation": "Many files lack sufficient documentation.",
+                    "action": "Add docstrings and comments to improve code maintainability",
+                }
+            )
+
         # CI/CD recommendations
-        ci_files = [".github/workflows", ".gitlab-ci.yml", "Jenkinsfile", ".travis.yml", "azure-pipelines.yml"]
-        has_ci = any((Path(complexity.get("metadata", {}).get("path", ".")) / ci).exists() for ci in ci_files)
+        ci_files = [
+            ".github/workflows",
+            ".gitlab-ci.yml",
+            "Jenkinsfile",
+            ".travis.yml",
+            "azure-pipelines.yml",
+        ]
+        has_ci = any(
+            (Path(complexity.get("metadata", {}).get("path", ".")) / ci).exists() for ci in ci_files
+        )
         if not has_ci:
-            recommendations.append({
-                "category": "DevOps",
-                "priority": "medium",
-                "recommendation": "No CI/CD configuration detected.",
-                "action": "Set up continuous integration to automatically run tests and checks"
-            })
-        
+            recommendations.append(
+                {
+                    "category": "DevOps",
+                    "priority": "medium",
+                    "recommendation": "No CI/CD configuration detected.",
+                    "action": "Set up continuous integration to automatically run tests and checks",
+                }
+            )
+
         return recommendations
-    
+
     def _format_complexity_results(self, complexity: Dict) -> Dict[str, Any]:
         """Format complexity results for reporting."""
         summary = complexity.get("summary", {})
-        
+
         # Get top complex files
         complex_files = []
         for file_path, metrics in complexity.get("files", {}).items():
             if isinstance(metrics, dict) and "total_complexity" in metrics:
-                complex_files.append({
-                    "file": file_path,
-                    "complexity": metrics["total_complexity"],
-                    "loc": metrics.get("loc", 0),
-                    "functions": len(metrics.get("functions", []))
-                })
-        
+                complex_files.append(
+                    {
+                        "file": file_path,
+                        "complexity": metrics["total_complexity"],
+                        "loc": metrics.get("loc", 0),
+                        "functions": len(metrics.get("functions", [])),
+                    }
+                )
+
         complex_files.sort(key=lambda x: x["complexity"], reverse=True)
-        
+
         return {
             "summary": summary,
             "top_complex_files": complex_files[:10],
@@ -295,122 +355,128 @@ class ReportGenerator:
                 "total_lines": summary.get("total_loc", 0),
                 "logical_lines": summary.get("total_lloc", 0),
                 "average_complexity": summary.get("average_complexity", 0),
-                "files_analyzed": summary.get("total_files", 0)
-            }
+                "files_analyzed": summary.get("total_files", 0),
+            },
         }
-    
-    def _format_verification_results(self, verification: Dict) -> Dict[str, Any]:
+
+    def _format_verification_results(self, verification: Dict[str, Any]) -> Dict[str, Any]:
         """Format verification results for reporting."""
-        formatted = {
+        formatted: Dict[str, Dict[str, Any]] = {
             "contracts_verified": {},
             "security_summary": {},
             "type_checking_summary": {},
-            "static_analysis_summary": {}
+            "static_analysis_summary": {},
         }
-        
+
         # Summarize contract verification
         for lang, results in verification.get("contracts", {}).items():
             if results:
                 formatted["contracts_verified"][lang] = {
                     "tools_used": list(results.keys()),
-                    "files_analyzed": len([k for k, v in results.items() if isinstance(v, dict)])
+                    "files_analyzed": len([k for k, v in results.items() if isinstance(v, dict)]),
                 }
-        
+
         # Summarize security findings
         security = verification.get("security", {})
         if "bandit" in security:
             bandit = security["bandit"]
             if isinstance(bandit, dict) and "metrics" in bandit:
                 formatted["security_summary"]["bandit"] = bandit["metrics"]
-        
+
         if "secrets" in security:
             secrets = security["secrets"]
             formatted["security_summary"]["secrets"] = {
                 "found": secrets.get("found", 0),
-                "types": [s.get("type") for s in secrets.get("details", [])]
+                "types": [s.get("type") for s in secrets.get("details", [])],
             }
-        
+
         # Summarize type checking
         for tool, results in verification.get("type_checking", {}).items():
             if isinstance(results, dict):
                 formatted["type_checking_summary"][tool] = {
                     "total_issues": results.get("total_issues", 0),
-                    "status": results.get("status", "unknown")
+                    "status": results.get("status", "unknown"),
                 }
-        
+
         # Summarize linting
         for tool, results in verification.get("linting", {}).items():
             if isinstance(results, dict):
                 formatted["static_analysis_summary"][tool] = {
                     "total_issues": results.get("total_issues", 0),
-                    "status": results.get("status", "unknown")
+                    "status": results.get("status", "unknown"),
                 }
-        
+
         return formatted
-    
+
     def _format_test_results(self, tests: Dict) -> Dict[str, Any]:
         """Format test results for reporting."""
         summary = tests.get("summary", {})
-        
+
         formatted = {
             "summary": summary,
             "frameworks_detected": tests.get("discovered_frameworks", {}),
             "test_results_by_framework": {},
-            "coverage_available": bool(tests.get("coverage", {}))
+            "coverage_available": bool(tests.get("coverage", {})),
         }
-        
+
         # Summarize results by framework
         for framework, results in tests.get("test_results", {}).items():
             if isinstance(results, dict) and "summary" in results:
                 formatted["test_results_by_framework"][framework] = results["summary"]
-        
+
         return formatted
-    
-    def _compile_detailed_findings(self, complexity: Dict, verification: Dict, tests: Dict) -> Dict[str, List[Dict]]:
+
+    def _compile_detailed_findings(
+        self, complexity: Dict[str, Any], verification: Dict[str, Any], tests: Dict[str, Any]
+    ) -> Dict[str, List[Dict[str, Any]]]:
         """Compile detailed findings for verification steps."""
-        findings = {
+        findings: Dict[str, List[Dict[str, Any]]] = {
             "complexity_issues": [],
             "security_issues": [],
             "test_failures": [],
             "type_errors": [],
-            "verification_failures": []
+            "verification_failures": [],
         }
-        
+
         # Complexity issues
         for file_path, metrics in complexity.get("files", {}).items():
             if isinstance(metrics, dict) and "functions" in metrics:
                 for func in metrics["functions"]:
                     if func.get("complexity", 0) > 10:
-                        findings["complexity_issues"].append({
-                            "file": file_path,
-                            "function": func.get("name"),
-                            "line": func.get("lineno"),
-                            "complexity": func.get("complexity"),
-                            "rank": func.get("rank")
-                        })
-        
+                        findings["complexity_issues"].append(
+                            {
+                                "file": file_path,
+                                "function": func.get("name"),
+                                "line": func.get("lineno"),
+                                "complexity": func.get("complexity"),
+                                "rank": func.get("rank"),
+                            }
+                        )
+
         # Security issues
         bandit_results = verification.get("security", {}).get("bandit", {}).get("results", [])
         for issue in bandit_results:
-            findings["security_issues"].append({
-                "file": issue.get("filename"),
-                "line": issue.get("line_number"),
-                "severity": issue.get("issue_severity"),
-                "confidence": issue.get("issue_confidence"),
-                "text": issue.get("issue_text"),
-                "test_id": issue.get("test_id")
-            })
-        
+            findings["security_issues"].append(
+                {
+                    "file": issue.get("filename"),
+                    "line": issue.get("line_number"),
+                    "severity": issue.get("issue_severity"),
+                    "confidence": issue.get("issue_confidence"),
+                    "text": issue.get("issue_text"),
+                    "test_id": issue.get("test_id"),
+                }
+            )
+
         # Test failures
-        for framework, results in tests.get("test_results", {}).items():
+        for _framework, results in tests.get("test_results", {}).items():
             if isinstance(results, dict):
                 # Extract failed tests from structured results
                 if "structured_results" in results:
                     # This would need framework-specific parsing
                     pass
-        
+
         return findings
-    
+
     def _get_languages(self, complexity: Dict) -> List[str]:
         """Extract detected languages from complexity analysis."""
         # This would be populated by the language detector
@@ -434,111 +500,124 @@ class ReportGenerator:
                 languages.add("Rust")
             elif ext == ".cs":
                 languages.add("C#")
-        
+
         return sorted(list(languages))
-    
+
     def _generate_markdown_report(self, report_data: Dict[str, Any]) -> Path:
         """Generate Markdown report."""
         template = self.jinja_env.get_template("markdown_report")
         content = template.render(**report_data)
-        
-        filename = f"report_{report_data['metadata']['repository']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"report_{report_data['metadata']['repository']}_{timestamp}.md"
         filepath = self.results_dir / filename
-        
-        with open(filepath, 'w') as f:
+
+        with open(filepath, "w") as f:
             f.write(content)
-        
+
         return filepath
-    
+
     def _generate_html_report(self, report_data: Dict[str, Any]) -> Path:
         """Generate HTML report."""
         template = self.jinja_env.get_template("html_report")
         content = template.render(**report_data)
-        
-        filename = f"report_{report_data['metadata']['repository']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"report_{report_data['metadata']['repository']}_{timestamp}.html"
         filepath = self.results_dir / filename
-        
-        with open(filepath, 'w') as f:
+
+        with open(filepath, "w") as f:
             f.write(content)
-        
+
         return filepath
-    
+
     def _generate_json_report(self, report_data: Dict[str, Any]) -> Path:
         """Generate JSON report."""
-        filename = f"report_{report_data['metadata']['repository']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"report_{report_data['metadata']['repository']}_{timestamp}.json"
         filepath = self.results_dir / filename
-        
-        with open(filepath, 'w') as f:
+
+        with open(filepath, "w") as f:
             json.dump(report_data, f, indent=2, default=str)
-        
+
         return filepath
-    
+
     def _generate_pdf_report(self, report_data: Dict[str, Any]) -> Path:
         """Generate PDF report."""
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Arial", size=12)
-        
+
         # Title
-        pdf.set_font("Arial", 'B', 20)
-        pdf.cell(0, 10, f"Code Analysis Report: {report_data['metadata']['repository']}", ln=True, align='C')
+        pdf.set_font("Arial", "B", 20)
+        pdf.cell(
+            0,
+            10,
+            f"Code Analysis Report: {report_data['metadata']['repository']}",
+            ln=True,
+            align="C",
+        )
         pdf.ln(10)
-        
+
         # Summary
-        pdf.set_font("Arial", 'B', 14)
+        pdf.set_font("Arial", "B", 14)
         pdf.cell(0, 10, "Executive Summary", ln=True)
         pdf.set_font("Arial", size=12)
-        
-        summary = report_data['summary']
+
+        summary = report_data["summary"]
         pdf.cell(0, 10, f"Health Score: {summary['health_score']:.1f}/100", ln=True)
         pdf.cell(0, 10, f"Critical Issues: {summary['critical_issues_count']}", ln=True)
         pdf.cell(0, 10, f"Languages: {', '.join(summary['languages_detected'])}", ln=True)
         pdf.ln(10)
-        
+
         # Critical Issues
-        if report_data['critical_issues']:
-            pdf.set_font("Arial", 'B', 14)
+        if report_data["critical_issues"]:
+            pdf.set_font("Arial", "B", 14)
             pdf.cell(0, 10, "Critical Issues", ln=True)
             pdf.set_font("Arial", size=11)
-            
-            for issue in report_data['critical_issues'][:10]:
-                pdf.multi_cell(0, 8, f"• [{issue['severity'].upper()}] {issue['description']}", align='L')
+
+            for issue in report_data["critical_issues"][:10]:
+                pdf.multi_cell(
+                    0, 8, f"• [{issue['severity'].upper()}] {issue['description']}", align="L"
+                )
                 pdf.ln(2)
-        
+
         # Recommendations
         pdf.add_page()
-        pdf.set_font("Arial", 'B', 14)
+        pdf.set_font("Arial", "B", 14)
         pdf.cell(0, 10, "Recommendations", ln=True)
         pdf.set_font("Arial", size=11)
-        
-        for rec in report_data['recommendations']:
-            pdf.set_font("Arial", 'B', 12)
+
+        for rec in report_data["recommendations"]:
+            pdf.set_font("Arial", "B", 12)
             pdf.cell(0, 8, f"{rec['category']} ({rec['priority']})", ln=True)
             pdf.set_font("Arial", size=11)
-            pdf.multi_cell(0, 6, rec['recommendation'], align='L')
-            pdf.multi_cell(0, 6, f"Action: {rec['action']}", align='L')
+            pdf.multi_cell(0, 6, rec["recommendation"], align="L")
+            pdf.multi_cell(0, 6, f"Action: {rec['action']}", align="L")
             pdf.ln(5)
-        
-        filename = f"report_{report_data['metadata']['repository']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"report_{report_data['metadata']['repository']}_{timestamp}.pdf"
         filepath = self.results_dir / filename
-        
+
         pdf.output(str(filepath))
-        
+
         return filepath
-    
+
     def _generate_verification_steps(self, report_data: Dict[str, Any]) -> Path:
         """Generate detailed verification steps document."""
         template = self.jinja_env.get_template("verification_steps")
         content = template.render(**report_data)
-        
-        filename = f"verification_steps_{report_data['metadata']['repository']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"verification_steps_{report_data['metadata']['repository']}_{timestamp}.md"
         filepath = self.results_dir / filename
-        
-        with open(filepath, 'w') as f:
+
+        with open(filepath, "w") as f:
             f.write(content)
-        
+
         return filepath
-    
+
     def _get_templates(self) -> Dict[str, str]:
         """Return Jinja2 templates."""
         return {
@@ -614,7 +693,6 @@ Generated: {{ metadata.timestamp }}
 Action: {{ rec.action }}
 {% endfor %}
 """,
-
             "html_report": """<!DOCTYPE html>
 <html>
 <head>
@@ -637,7 +715,7 @@ Action: {{ rec.action }}
 <body>
     <h1>Code Analysis Report: {{ metadata.repository }}</h1>
     <p>Generated: {{ metadata.timestamp }}</p>
-    
+
     <div class="summary">
         <h2>Executive Summary</h2>
         <div class="metric">
@@ -649,10 +727,10 @@ Action: {{ rec.action }}
             <div>Critical Issues</div>
         </div>
     </div>
-    
+
     <h2>Languages Detected</h2>
     <p>{{ summary.languages_detected|join(', ') }}</p>
-    
+
     <h2>Test Results</h2>
     <table>
         <tr>
@@ -676,21 +754,24 @@ Action: {{ rec.action }}
             <td>{{ "%.1f"|format(test_analysis.summary.success_rate) }}%</td>
         </tr>
     </table>
-    
+
     <h2>Critical Issues</h2>
     {% for issue in critical_issues %}
-    <div style="margin: 20px 0; padding: 15px; border-left: 4px solid #d32f2f; background: #ffebee;">
+    <div style="margin: 20px 0; padding: 15px; border-left: 4px solid #d32f2f;
+         background: #ffebee;">
         <h3>{{ issue.type|replace('_', ' ')|title }}</h3>
-        <p><strong>Severity:</strong> <span class="{{ issue.severity }}">{{ issue.severity|upper }}</span></p>
+        <p><strong>Severity:</strong>
+           <span class="{{ issue.severity }}">{{ issue.severity|upper }}</span></p>
         <p><strong>Location:</strong> <code>{{ issue.location }}</code></p>
         <p>{{ issue.description }}</p>
         <p><em>{{ issue.recommendation }}</em></p>
     </div>
     {% endfor %}
-    
+
     <h2>Recommendations</h2>
     {% for rec in recommendations %}
-    <div style="margin: 20px 0; padding: 15px; border-left: 4px solid #2196f3; background: #e3f2fd;">
+    <div style="margin: 20px 0; padding: 15px; border-left: 4px solid #2196f3;
+         background: #e3f2fd;">
         <h3>{{ rec.category }}</h3>
         <p><strong>Priority:</strong> {{ rec.priority }}</p>
         <p>{{ rec.recommendation }}</p>
@@ -699,7 +780,6 @@ Action: {{ rec.action }}
     {% endfor %}
 </body>
 </html>""",
-
             "verification_steps": """# Verification Steps for {{ metadata.repository }}
 
 Generated: {{ metadata.timestamp }}
@@ -922,28 +1002,30 @@ chmod +x verify_analysis.sh
 5. Establish code quality gates
 
 For questions about these results, consult your team's security and quality guidelines.
-"""
+""",
         }
-    
-    
+
+
 class SummaryReporter:
     """Generates quick summary reports for console output."""
-    
+
     @staticmethod
-    def generate_console_summary(complexity: Dict, verification: Dict, tests: Dict) -> str:
+    def generate_console_summary(
+        complexity: Dict[str, Any], verification: Dict[str, Any], tests: Dict[str, Any]
+    ) -> str:
         """Generate a concise summary for console output."""
         lines = []
-        lines.append("\n" + "="*60)
+        lines.append("\n" + "=" * 60)
         lines.append("VIBE VERIFIER ANALYSIS SUMMARY")
-        lines.append("="*60)
-        
+        lines.append("=" * 60)
+
         # Complexity summary
         lines.append("\n📊 COMPLEXITY ANALYSIS")
         summary = complexity.get("summary", {})
         lines.append(f"  Files analyzed: {summary.get('total_files', 0)}")
         lines.append(f"  Total lines: {summary.get('total_loc', 0)}")
         lines.append(f"  Average complexity: {summary.get('average_complexity', 0):.2f}")
-        
+
         # Show complexity distribution
         dist = summary.get("complexity_distribution", {})
         if dist:
@@ -951,7 +1033,7 @@ class SummaryReporter:
             for level, count in dist.items():
                 if count > 0:
                     lines.append(f"    {level}: {count} functions")
-        
+
         # Test summary
         lines.append("\n🧪 TEST ANALYSIS")
         test_summary = tests.get("summary", {})
@@ -962,21 +1044,21 @@ class SummaryReporter:
             lines.append(f"  Success rate: {test_summary.get('success_rate', 0):.1f}%")
         else:
             lines.append("  ⚠️  No tests found!")
-        
+
         # Security summary
         lines.append("\n🔒 SECURITY ANALYSIS")
         security = verification.get("security", {})
-        
+
         if "bandit" in security:
             bandit = security["bandit"]
             if isinstance(bandit, dict) and "results" in bandit:
                 lines.append(f"  Security issues found: {len(bandit['results'])}")
-        
+
         if "secrets" in security:
             secrets = security["secrets"]
             if secrets.get("found", 0) > 0:
                 lines.append(f"  ⚠️  Potential secrets found: {secrets['found']}")
-        
+
         # Type checking summary
         type_checking = verification.get("type_checking", {})
         if type_checking:
@@ -984,9 +1066,9 @@ class SummaryReporter:
             for tool, results in type_checking.items():
                 if isinstance(results, dict):
                     lines.append(f"  {tool}: {results.get('total_issues', 0)} issues")
-        
-        lines.append("\n" + "="*60)
+
+        lines.append("\n" + "=" * 60)
         lines.append("Full reports generated in ./reports/")
-        lines.append("="*60 + "\n")
-        
+        lines.append("=" * 60 + "\n")
+
         return "\n".join(lines)

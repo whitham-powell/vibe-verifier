@@ -176,7 +176,7 @@ pytest
 # Run with coverage
 pytest --cov=src --cov-report=html --cov-report=term
 
-# Run only unit tests  
+# Run only unit tests
 pytest -k "not integration"
 
 # Run only integration tests
@@ -210,7 +210,7 @@ def test_documentation_claims_are_not_trusted(self):
     """Test that documentation claims are marked as unverified until proven."""
     analyzer = DocumentationAnalyzer("/path/to/repo")
     results = analyzer.analyze()
-    
+
     # All claims should start as unverified
     for claim in results["claims"]:
         assert claim["verified"] is False
@@ -225,23 +225,23 @@ from unittest.mock import patch, MagicMock
 
 class TestNewFeature:
     """Test new feature functionality."""
-    
+
     @pytest.fixture
     def sample_data(self):
         """Create sample data for tests."""
         return {"key": "value"}
-    
+
     def test_basic_functionality(self, sample_data):
         """Test basic feature behavior."""
         # Arrange
         feature = NewFeature()
-        
+
         # Act
         result = feature.process(sample_data)
-        
+
         # Assert
         assert result["status"] == "success"
-    
+
     @patch('subprocess.run')
     def test_external_tool_integration(self, mock_run):
         """Test integration with external tools."""
@@ -249,10 +249,10 @@ class TestNewFeature:
             stdout='{"result": "ok"}',
             returncode=0
         )
-        
+
         feature = NewFeature()
         result = feature.run_external_tool()
-        
+
         assert result["result"] == "ok"
         mock_run.assert_called_once()
 ```
@@ -311,7 +311,7 @@ class NewAnalyzer:
     def __init__(self, repo_path: str):
         self.repo_path = Path(repo_path)
         self.results = {}
-    
+
     def analyze(self) -> Dict[str, Any]:
         # Implement analysis logic
         return self.results
@@ -345,13 +345,13 @@ def _get_templates(self) -> Dict[str, str]:
 def _generate_new_format_report(self, report_data: Dict[str, Any]) -> Path:
     template = self.jinja_env.get_template("new_format")
     content = template.render(**report_data)
-    
+
     filename = f"report_{report_data['metadata']['repository']}_new.ext"
     filepath = self.results_dir / filename
-    
+
     with open(filepath, 'w') as f:
         f.write(content)
-    
+
     return filepath
 ```
 
@@ -375,7 +375,7 @@ mypy src/
 
 2. Type hints are required:
 ```python
-def process_data(data: List[Dict[str, Any]], 
+def process_data(data: List[Dict[str, Any]],
                 config: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
     """Process data with optional configuration."""
     pass
@@ -385,12 +385,12 @@ def process_data(data: List[Dict[str, Any]],
 ```python
 def analyze(self) -> Dict[str, Any]:
     """Analyze repository and return results.
-    
+
     Returns:
         Dict containing analysis results with keys:
         - 'summary': Overall summary statistics
         - 'details': Detailed findings
-        
+
     Raises:
         AnalysisError: If analysis fails
     """
@@ -504,13 +504,13 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 def analyze_files_parallel(self, files: List[Path]) -> Dict[str, Any]:
     results = {}
-    
+
     with ThreadPoolExecutor(max_workers=4) as executor:
         future_to_file = {
-            executor.submit(self._analyze_single_file, f): f 
+            executor.submit(self._analyze_single_file, f): f
             for f in files
         }
-        
+
         for future in as_completed(future_to_file):
             file_path = future_to_file[future]
             try:
@@ -518,7 +518,7 @@ def analyze_files_parallel(self, files: List[Path]) -> Dict[str, Any]:
                 results[str(file_path)] = result
             except Exception as e:
                 results[str(file_path)] = {"error": str(e)}
-    
+
     return results
 ```
 
@@ -535,11 +535,11 @@ def test_tool_integration(mock_run):
         stderr="",
         returncode=0
     )
-    
+
     # Test the integration
     analyzer = ToolAnalyzer()
     result = analyzer.run_analysis()
-    
+
     # Verify correct command was called
     mock_run.assert_called_with(
         ["tool", "--json", "--input", ANY],
@@ -607,7 +607,7 @@ find . -type f -name "*.pyc" -delete
 - **API Documentation**: Generated with `make docs`
 - **Core Team**: @maintainer1, @maintainer2
 
-Remember: 
+Remember:
 - When in doubt, write a test!
 - When analyzing, verify everything!
 - Documentation is a hypothesis, not a fact!
