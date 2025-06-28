@@ -117,13 +117,14 @@ vibe-verifier /path/to/your/repo
 ```
 
 This will:
-1. Detect programming languages used
-2. Extract claims from documentation
-3. Analyze code complexity
-4. Run static analysis and security checks
-5. Execute existing tests
-6. Verify documentation claims against implementation
-7. Generate comprehensive reports
+1. Analyze git history (if applicable) for insights about code evolution
+2. Detect programming languages used
+3. Extract claims from documentation
+4. Analyze code complexity
+5. Run static analysis and security checks
+6. Execute existing tests
+7. Verify documentation claims against implementation
+8. Generate comprehensive reports
 
 ### Quick Analysis
 
@@ -178,6 +179,14 @@ After analysis, you'll find reports in the `./reports/` directory:
 - **High**: Should be fixed soon (failing documentation claims, high complexity)
 - **Medium**: Plan to address (type errors, missing tests)
 - **Low**: Nice to fix (style issues, minor warnings)
+
+#### Git History Insights
+If analyzing a git repository, additional insights include:
+- **Repository maturity**: Young repositories (<90 days) may have unstable features
+- **Bus factor**: Low values (<3) indicate over-reliance on few contributors
+- **Documentation freshness**: Identifies outdated docs compared to code changes
+- **Code stability**: High-churn files may indicate instability
+- **Feature/fix ratio**: High bug fix ratio may indicate quality issues
 
 ### Reading the HTML Report
 

@@ -8,6 +8,7 @@ from typing import Any, Dict, Optional
 
 from .analyzers.complexity import ComplexityAnalyzer, LanguageDetector
 from .analyzers.documentation_analyzer import ClaimVerifier, DocumentationAnalyzer
+from .analyzers.git_history import GitHistoryAnalyzer
 from .reporters.report_generator import ReportGenerator, SummaryReporter
 from .testers.test_runner import UniversalTestRunner
 from .verifiers.formal_verifier import FormalVerifier
@@ -39,6 +40,28 @@ class VibeVerifier:
         """Run complete analysis pipeline."""
         print(f"\n🔍 Starting Vibe Verifier analysis for: {self.repo_path}")
         print("=" * 60)
+
+        # Phase 0: Git History Analysis (if applicable)
+        print("\n🔍 Phase 0: Git History Analysis")
+        git_analyzer = GitHistoryAnalyzer(str(self.repo_path))
+        git_results = git_analyzer.analyze()
+        self.results["git_history"] = git_results
+
+        if git_results.get("is_git_repo"):
+            repo_info = git_results.get("repository_info", {})
+            print(f"  Repository age: {repo_info.get('repo_age_days', 0)} days")
+            print(f"  Total commits: {repo_info.get('total_commits', 0)}")
+            contributors = git_results.get("contributor_analysis", {})
+            print(f"  Contributors: {contributors.get('total_contributors', 0)}")
+
+            # Display key insights
+            insights = git_results.get("insights", [])
+            if insights:
+                print("  Key insights:")
+                for insight in insights[:3]:  # Show top 3 insights
+                    print(f"    - {insight['message']}")
+        else:
+            print("  Not a git repository - skipping git history analysis")
 
         # Phase 1: Language Detection
         print("\n📊 Phase 1: Language Detection")
@@ -134,6 +157,7 @@ class VibeVerifier:
             test_results,
             str(self.repo_path),
             self.config.get("output_format", "all"),
+            git_results,
         )
         self.results["reports"] = generated_reports
 

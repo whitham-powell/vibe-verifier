@@ -389,9 +389,9 @@ class UniversalTestRunner:
             "framework": framework,
             "language": language,
             "exit_code": result.returncode,
-            "stdout": result.stdout[-5000:]
-            if len(result.stdout) > 5000
-            else result.stdout,  # Limit output
+            "stdout": (
+                result.stdout[-5000:] if len(result.stdout) > 5000 else result.stdout
+            ),  # Limit output
             "stderr": result.stderr[-5000:] if len(result.stderr) > 5000 else result.stderr,
         }
 

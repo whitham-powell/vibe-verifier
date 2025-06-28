@@ -31,11 +31,12 @@ class ReportGenerator:
         test_results: Dict[str, Any],
         repo_path: str,
         output_format: str = "all",
+        git_results: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, str]:
         """Generate comprehensive report in multiple formats."""
         # Prepare report data
         report_data = self._prepare_report_data(
-            complexity_results, verification_results, test_results, repo_path
+            complexity_results, verification_results, test_results, repo_path, git_results
         )
 
         # Generate reports in different formats
@@ -69,19 +70,24 @@ class ReportGenerator:
         verification: Dict[str, Any],
         tests: Dict[str, Any],
         repo_path: str,
+        git_history: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Prepare and structure report data."""
         timestamp = datetime.now().isoformat()
         repo_name = Path(repo_path).name
 
         # Calculate overall health score
-        health_score = self._calculate_health_score(complexity, verification, tests)
+        health_score = self._calculate_health_score(complexity, verification, tests, git_history)
 
         # Identify critical issues
-        critical_issues = self._identify_critical_issues(complexity, verification, tests)
+        critical_issues = self._identify_critical_issues(
+            complexity, verification, tests, git_history
+        )
 
         # Generate recommendations
-        recommendations = self._generate_recommendations(complexity, verification, tests)
+        recommendations = self._generate_recommendations(
+            complexity, verification, tests, git_history
+        )
 
         return {
             "metadata": {
@@ -101,13 +107,18 @@ class ReportGenerator:
             "complexity_analysis": self._format_complexity_results(complexity),
             "verification_analysis": self._format_verification_results(verification),
             "test_analysis": self._format_test_results(tests),
+            "git_analysis": self._format_git_results(git_history) if git_history else None,
             "critical_issues": critical_issues,
             "recommendations": recommendations,
             "detailed_findings": self._compile_detailed_findings(complexity, verification, tests),
         }
 
     def _calculate_health_score(
-        self, complexity: Dict[str, Any], verification: Dict[str, Any], tests: Dict[str, Any]
+        self,
+        complexity: Dict[str, Any],
+        verification: Dict[str, Any],
+        tests: Dict[str, Any],
+        git_history: Optional[Dict[str, Any]] = None,
     ) -> float:
         """Calculate overall repository health score (0-100)."""
         score = 100.0
@@ -139,10 +150,33 @@ class ReportGenerator:
         if security_issues > 0:
             score -= min(25, security_issues * 2)
 
+        # Git history factors (if available)
+        if git_history and git_history.get("is_git_repo"):
+            # Young repository penalty
+            repo_age = git_history.get("repository_info", {}).get("repo_age_days", 365)
+            if repo_age < 90:
+                score -= 5  # Very young repos may be unstable
+
+            # Bus factor penalty
+            bus_factor = git_history.get("contributor_analysis", {}).get("bus_factor", 3)
+            if bus_factor < 3:
+                score -= min(10, (3 - bus_factor) * 5)
+
+            # High churn penalty
+            high_churn_files = len(
+                git_history.get("stability_analysis", {}).get("high_churn_files", [])
+            )
+            if high_churn_files > 5:
+                score -= min(10, high_churn_files)
+
         return max(0, score)
 
     def _identify_critical_issues(
-        self, complexity: Dict[str, Any], verification: Dict[str, Any], tests: Dict[str, Any]
+        self,
+        complexity: Dict[str, Any],
+        verification: Dict[str, Any],
+        tests: Dict[str, Any],
+        git_history: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, Any]]:
         """Identify critical issues that need immediate attention."""
         critical_issues = []
@@ -226,10 +260,48 @@ class ReportGenerator:
                     }
                 )
 
+        # Git history issues
+        if git_history and git_history.get("is_git_repo"):
+            # Low bus factor
+            bus_factor = git_history.get("contributor_analysis", {}).get("bus_factor", 3)
+            if bus_factor < 2:
+                critical_issues.append(
+                    {
+                        "type": "low_bus_factor",
+                        "severity": "high",
+                        "location": "repository",
+                        "description": (
+                            f"Low bus factor ({bus_factor}) - " "over-reliance on few contributors"
+                        ),
+                        "recommendation": "Encourage knowledge sharing and more contributors",
+                    }
+                )
+
+            # Outdated documentation
+            outdated_docs = git_history.get("documentation_sync", {}).get(
+                "potentially_outdated_docs", []
+            )
+            if len(outdated_docs) > 0:
+                critical_issues.append(
+                    {
+                        "type": "outdated_documentation",
+                        "severity": "medium",
+                        "location": "documentation",
+                        "description": (
+                            f"{len(outdated_docs)} documentation files " "may be outdated"
+                        ),
+                        "recommendation": "Review and update documentation to match code changes",
+                    }
+                )
+
         return critical_issues
 
     def _generate_recommendations(
-        self, complexity: Dict[str, Any], verification: Dict[str, Any], tests: Dict[str, Any]
+        self,
+        complexity: Dict[str, Any],
+        verification: Dict[str, Any],
+        tests: Dict[str, Any],
+        git_history: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, str]]:
         """Generate actionable recommendations based on analysis."""
         recommendations = []
@@ -325,6 +397,56 @@ class ReportGenerator:
                     "action": "Set up continuous integration to automatically run tests and checks",
                 }
             )
+
+        # Git history recommendations
+        if git_history and git_history.get("is_git_repo"):
+            # Young repository warning
+            repo_age = git_history.get("repository_info", {}).get("repo_age_days", 365)
+            if repo_age < 90:
+                recommendations.append(
+                    {
+                        "category": "Maturity",
+                        "priority": "medium",
+                        "recommendation": (
+                            f"Repository is only {repo_age} days old - " "features may be unstable."
+                        ),
+                        "action": (
+                            "Consider the maturity of the codebase when evaluating "
+                            "for production use"
+                        ),
+                    }
+                )
+
+            # Contributor recommendations
+            bus_factor = git_history.get("contributor_analysis", {}).get("bus_factor", 3)
+            if bus_factor < 3:
+                recommendations.append(
+                    {
+                        "category": "Sustainability",
+                        "priority": "high",
+                        "recommendation": (
+                            f"Low bus factor ({bus_factor}) indicates "
+                            "over-reliance on few contributors."
+                        ),
+                        "action": "Encourage more contributors and document key knowledge areas",
+                    }
+                )
+
+            # Documentation sync
+            doc_sync = git_history.get("documentation_sync", {})
+            outdated_docs = doc_sync.get("potentially_outdated_docs", [])
+            if len(outdated_docs) > 3:
+                recommendations.append(
+                    {
+                        "category": "Documentation",
+                        "priority": "high",
+                        "recommendation": (
+                            f"{len(outdated_docs)} documentation files appear "
+                            "outdated compared to code changes."
+                        ),
+                        "action": "Review and update documentation to reflect recent code changes",
+                    }
+                )
 
         return recommendations
 
@@ -423,6 +545,54 @@ class ReportGenerator:
         for framework, results in tests.get("test_results", {}).items():
             if isinstance(results, dict) and "summary" in results:
                 formatted["test_results_by_framework"][framework] = results["summary"]
+
+        return formatted
+
+    def _format_git_results(self, git_history: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        """Format git history results for reporting."""
+        if not git_history or not git_history.get("is_git_repo"):
+            return {"is_git_repo": False}
+
+        formatted = {
+            "is_git_repo": True,
+            "repository_info": git_history.get("repository_info", {}),
+            "commit_patterns": git_history.get("commit_history", {}).get("commit_patterns", {}),
+            "contributor_summary": {
+                "total_contributors": git_history.get("contributor_analysis", {}).get(
+                    "total_contributors", 0
+                ),
+                "bus_factor": git_history.get("contributor_analysis", {}).get("bus_factor", 0),
+                "top_contributors": git_history.get("contributor_analysis", {}).get(
+                    "contributors", []
+                )[:5],
+            },
+            "stability_metrics": {
+                "high_churn_files": len(
+                    git_history.get("stability_analysis", {}).get("high_churn_files", [])
+                ),
+                "stable_files": len(
+                    git_history.get("stability_analysis", {}).get("stable_files", [])
+                ),
+            },
+            "documentation_sync": {
+                "documentation_files": git_history.get("documentation_sync", {}).get(
+                    "documentation_files", 0
+                ),
+                "outdated_docs": len(
+                    git_history.get("documentation_sync", {}).get("potentially_outdated_docs", [])
+                ),
+            },
+            "insights": git_history.get("insights", [])[:5],  # Top 5 insights
+        }
+
+        # Version info
+        version_info = git_history.get("version_analysis", {})
+        if version_info:
+            formatted["version_info"] = {
+                "latest_version": version_info.get("latest_version"),
+                "total_versions": version_info.get("total_versions", 0),
+                "semver_compliant": version_info.get("semver_compliant", False),
+            }
 
         return formatted
 
@@ -673,6 +843,36 @@ Generated: {{ metadata.timestamp }}
 
 ### Frameworks Detected
 {{ test_analysis.summary.frameworks_used|join(', ') }}
+
+{% if git_analysis and git_analysis.is_git_repo %}
+## Git History Analysis
+
+### Repository Information
+- **Age**: {{ git_analysis.repository_info.repo_age_days }} days
+- **Total Commits**: {{ git_analysis.repository_info.total_commits }}
+- **Current Branch**: {{ git_analysis.repository_info.current_branch }}
+
+### Contributor Analysis
+- **Total Contributors**: {{ git_analysis.contributor_summary.total_contributors }}
+- **Bus Factor**: {{ git_analysis.contributor_summary.bus_factor }}
+
+### Code Stability
+- **High Churn Files**: {{ git_analysis.stability_metrics.high_churn_files }}
+- **Stable Files**: {{ git_analysis.stability_metrics.stable_files }}
+
+### Commit Patterns
+- **Features**: {{ git_analysis.commit_patterns.features }}
+- **Bug Fixes**: {{ git_analysis.commit_patterns.fixes }}
+- **Documentation**: {{ git_analysis.commit_patterns.documentation }}
+- **Refactoring**: {{ git_analysis.commit_patterns.refactoring }}
+
+{% if git_analysis.insights %}
+### Key Insights
+{% for insight in git_analysis.insights %}
+- **{{ insight.category|title }}**: {{ insight.message }}
+{% endfor %}
+{% endif %}
+{% endif %}
 
 ## Critical Issues
 
